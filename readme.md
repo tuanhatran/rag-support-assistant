@@ -117,7 +117,7 @@ Set `CYPRESS_BASE_URL` to test another origin, for example `http://localhost:517
 
 ## Development workflow (agents)
 
-Four custom agents in `.github/agents/` split each task into independent stages. Each task (ticket) has its own handoff file `.github/handoff/tasks/<TASK-ID>.md`, for example `PROJ-123.md`, created by the planner from [.github/handoff/TEMPLATE.md](.github/handoff/TEMPLATE.md). Agents share state only through that file, so each stage can run in a fresh chat session and several tasks can be in flight at once.
+Four custom agents in `.github/agents/` split each task into independent stages. Each task (ticket) has its own handoff file `.github/handoff/tasks/<TASK-ID>.md`, for example `PROJ-123.md`, created by the planner from [.github/handoff/TEMPLATE.md](.github/handoff/TEMPLATE.md). Agents share state only through that file, so each stage can run in a fresh chat session and several tasks can be in flight at once. Every development task uses one new branch shared by all stages: the orchestrator asks for its name and creates it before planning; when agents are run manually, the first agent asks for a name and creates it. The branch is recorded in the handoff and reused on resume. Agents require a clean worktree before creating or switching branches and do not commit or push.
 
 | Agent | Acts when Status is | Can edit | Sets Status to |
 | --- | --- | --- | --- |

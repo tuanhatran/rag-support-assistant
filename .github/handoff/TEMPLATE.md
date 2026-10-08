@@ -15,6 +15,7 @@ Planner model: Claude Sonnet 5.5 (copilot). Use the exact model names in the age
 ## Current Task
 
 - Task:
+- Branch:
 - Complexity:
 - Context files:
 - Acceptance criteria:
