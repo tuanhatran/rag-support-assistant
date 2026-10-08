@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Perform a read-only correctness and security review of the tested handoff.
-model: Claude Sonnet 5.5 (copilot)
+model: Claude Haiku 5.5 (copilot)
 tools:
   - read
   - search

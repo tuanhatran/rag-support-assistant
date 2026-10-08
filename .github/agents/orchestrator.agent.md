@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: Run the full planner, coder, tester, reviewer workflow automatically for one ticket (task ID plus description).
-model: Claude Sonnet 5.5 (copilot)
+model: Claude Haiku 5.5 (copilot)
 agents:
   - planner
   - coder
@@ -52,7 +52,7 @@ Always set the subagent `model` explicitly when dispatching, so the routing does
 | Subagent | `model` |
 | --- | --- |
 | `coder`, `tester` | `Gemini 3.8 Flash (copilot)` |
-| `planner`, `reviewer` | `Claude Sonnet 5.5 (copilot)` |
+| `planner`, `reviewer` | `Claude Haiku 5.5 (copilot)` |
 
 These match the `model` in each agent's own frontmatter. If the task file's routing table assigns a different model for its complexity, use that table instead.
 

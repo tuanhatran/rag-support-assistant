@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Break a Fieldnote task into scoped implementation work and prepare the coder handoff.
-model: Claude Sonnet 5.5 (copilot)
+model: Claude Haiku 5.5 (copilot)
 tools:
   - read
   - search

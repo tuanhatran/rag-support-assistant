@@ -6,11 +6,11 @@ Status: DONE
 
 | Complexity | Coder | Tester | Reviewer |
 | --- | --- | --- | --- |
-| S | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Sonnet 5.5 (copilot) |
-| M | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Sonnet 5.5 (copilot) |
-| L | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Sonnet 5.5 (copilot) |
+| S | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| M | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| L | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
 
-Planner model: Claude Sonnet 5.5 (copilot). Use the exact model names in the agent picker.
+Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agent picker.
 
 ## Current Task
 
@@ -55,7 +55,7 @@ Planner model: Claude Sonnet 5.5 (copilot). Use the exact model names in the age
 
 ## Handoff
 
-@reviewer (model: Claude Sonnet 5.5 (copilot)):
+@reviewer (model: Claude Haiku 5.5 (copilot)):
 All acceptance criteria have been verified and passed after the Dockerfile fix round.
 
 ### Test Commands and Results
