@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/components/adminview.tsx","./src/components/chatview.tsx","./src/components/documentsview.tsx","./src/components/loginpage.tsx","./src/components/markdown.tsx","./src/components/policymodal.tsx","./src/components/privacyview.tsx"],"version":"5.7.3"}

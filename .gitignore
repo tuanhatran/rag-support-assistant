@@ -1,0 +1,14 @@
+.env
+backend/.env
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+*.py[cod]
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/cypress/screenshots/
+frontend/cypress/videos/
+frontend/cypress/downloads/
+*.log
