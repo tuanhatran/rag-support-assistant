@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Perform a read-only correctness and security review of the tested handoff.
-model: Claude Haiku 5.5 (copilot)
+model: GPT-6 Luna
 tools:
   - read
   - search

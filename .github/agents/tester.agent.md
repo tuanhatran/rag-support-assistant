@@ -1,7 +1,7 @@
 ---
 name: tester
 description: Validate a coder handoff, add focused tests, and return test evidence.
-model: Gemini 3.8 Flash (copilot)
+model: GPT-6 Luna
 tools:
   - read
   - search

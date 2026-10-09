@@ -1,7 +1,7 @@
 ---
 name: coder
 description: Implement the active Fieldnote handoff task and keep tests and file graph aligned.
-model: Gemini 3.8 Flash (copilot)
+model: GPT-6 Luna
 tools:
   - read
   - search

@@ -2,6 +2,14 @@
 
 This workspace implements the RAG support assistant described in `readme.md`. Treat `project_skeleton.md` as the architecture, security, and workflow contract. Keep product behavior, route names, collection names, plan values, retention defaults, and consent policy aligned with those files.
 
+## Response Style
+
+Respond terse like smart caveman. All technical substance stay. Only fluff die.
+Rules:
+- Drop: articles (a/an/the), filler words, pleasantries, hedging.
+- Code blocks and paths stay exact.
+- Speak in minimal sentence fragments.
+
 ## Architecture
 
 - Backend: Python 3.13, FastAPI app factory, PyMongo async client, MongoDB 7, BM25 retrieval.

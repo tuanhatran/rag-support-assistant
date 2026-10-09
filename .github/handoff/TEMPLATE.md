@@ -6,11 +6,11 @@ Status: READY_FOR_CODE
 
 | Complexity | Coder | Tester | Reviewer |
 | --- | --- | --- | --- |
-| S | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
-| M | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
-| L | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| S | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| M | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| L | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
 
-Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agent picker.
+Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
 
 ## Current Task
 
