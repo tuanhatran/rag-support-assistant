@@ -38,9 +38,9 @@ describe('Admin screen', () => {
     })
   })
 
-  it('shows the four admin tabs', () => {
+  it('shows the 5 admin tabs', () => {
     cy.get('[role="tab"]').then($tabs => {
-      expect($tabs.toArray().map(tab => tab.textContent)).to.deep.equal(['LLM connections', 'Users', 'Chat feedback', 'Audit log'])
+      expect($tabs.toArray().map(tab => tab.textContent)).to.deep.equal(['LLM connections','Ingestion', 'Users', 'Chat feedback', 'Audit log'])
     })
     cy.contains('[role="tab"]', 'LLM connections').should('have.attr', 'aria-selected', 'true')
   })
