@@ -100,7 +100,10 @@ describe('Admin screen', () => {
     it('saves a staged plan change only after confirmation', () => {
       cy.intercept('PATCH', '/api/admin/users/*').as('updateUser')
       cy.contains('tr', user.username).find('select').eq(1).select('premium')
-      cy.contains('tr', user.username).contains('button', 'Confirm plan change').click()
+      cy.contains('tr', user.username).find('.table-actions').within(() => {
+        cy.get('select').should('have.value', 'premium')
+        cy.contains('button', 'Confirm plan change').click()
+      })
       cy.wait('@updateUser').its('response.statusCode').should('eq', 200)
       cy.get('.page-alert').should('contain', `Updated ${user.username}.`)
       cy.contains('tr', user.username).find('select').eq(1).should('have.value', 'premium')

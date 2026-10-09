@@ -1,6 +1,6 @@
 # Agent Handoff: RSA-3
 
-Status: BLOCKED
+Status: READY_FOR_REVIEW
 
 ## Model Routing
 
@@ -14,23 +14,55 @@ Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
 
 ## Current Task
 
-- Task: Isolate the first failing stage in `admin.cy.ts` `beforeEach` (user registration, conversation seed/feedback, admin login/consent, or visit/Admin navigation), fix Cypress test setup only when evidence identifies an in-scope defect, then rerun the Admin E2E against the real local stack and verify staged plan-change confirmation/cancellation behavior.
+- Task: Rerun the Admin E2E against the real local stack and verify staged plan-change confirmation/cancellation behavior. Place the confirmation button at the end of the row containing the change dropdown, not below the dropdown. Treat the earlier Cypress routing failure as historical; verify current behavior before drawing conclusions.
 - Branch: `feat/RSA-3-add-confirmation-button-admin`
 - Complexity: S
 - Context files: `.github/context/FILE_GRAPH.md`, `readme.md`, `frontend/package.json`, `frontend/cypress.config.ts`, `frontend/cypress/e2e/admin.cy.ts`, `frontend/cypress/support/helpers.ts`, `frontend/cypress/support/commands.ts`, `frontend/src/components/AdminView.tsx`
 - Acceptance criteria:
--  - Re-run the Admin spec and identify the first failing `beforeEach` stage among `registerUser`, `seedConversation`/feedback submission, `adminLogin` (including consent), and `visit`/Admin navigation. Report only the failing stage and safe status/response metadata; never record credentials, request/response bodies, or secret values.
+-  - Run the Admin spec against the real local app/backend and report whether setup and Admin navigation complete. If setup fails, identify the first failing `beforeEach` stage among `registerUser`, `seedConversation`/feedback submission, `adminLogin` (including consent), and `visit`/Admin navigation; report only safe status/response metadata.
 -  - Make a Cypress spec/support/config-only setup change only if the observed evidence demonstrates a test setup defect. Do not change backend production behavior to conceal or compensate for an unverified Cypress failure.
 -  - Exercise real local app/backend requests. Do not stub, mock, suppress, or bypass setup or application behavior with Cypress intercepts; retain existing behavioral assertions that still send requests to the real app.
 -  - Once setup succeeds, the confirmation and cancellation cases execute (not pending or skipped) and pass: confirmation persists the selected plan, cancellation submits no update and leaves the saved plan unchanged.
+-  - The confirmation button appears at the end of the plan-change row, after the change dropdown, rather than below the dropdown.
 -  - If a real app/backend failure is reproduced, record sanitized evidence and the exact failing stage; do not claim the confirmation/cancellation acceptance cases passed unless they ran.
 -  - Preserve the existing confirmation UI behavior, success/error handling, and all unrelated staged/unstaged worktree changes.
 - Test commands: `cd frontend && npm run e2e -- --spec cypress/e2e/admin.cy.ts`; `cd frontend && npm run build` if Cypress files/config change
+
+## Tester Retest (2026-10-10)
+
+- Verified checked-out branch: `feat/RSA-3-add-confirmation-button-admin`.
+- Confirmed local Docker Compose frontend, backend, MongoDB, and Postgres services were running. Cypress config loaded root `.env` silently; E2E used `http://localhost:8080` and real app/backend requests, with no setup or application stubs.
+- `npm run e2e -- --spec cypress/e2e/admin.cy.ts` (run from `frontend`; final run captured Cypress process status): passed, 10 passing, 0 failing, 0 pending, 0 skipped; Cypress process exit status 0. Registration, conversation/feedback setup, admin login/consent, and Admin navigation completed.
+- Cancellation case passed: selecting `premium` did not change the saved `standard` plan; cancel restored `standard` and no PATCH request was observed.
+- Confirmation case passed: confirmation button was in the same `.table-actions` plan-change row after the dropdown; confirming sent the update, returned HTTP 200, and persisted `premium`.
+- `npm run build` (run from `frontend`): passed (`tsc -b` and Vite production build).
+- No credentials, response bodies, or secret values recorded. No files beyond expected RSA-3 changes were introduced by verification.
+- Outcome: `READY_FOR_REVIEW`.
 - Fix rounds: 0 / 3
-- Previous stage: Planning
-- Notes: Latest user report, verbatim: `beforeEach fail`. `project_skeleton.md` is absent. Root `.env` already has the Cypress admin variables and config loads them silently. Treat prior synthetic-500 and access-log findings below as historical; the exact failing stage in the current `beforeEach` must be isolated. Never print, copy, or record `.env` values. Set `CYPRESS_BASE_URL` to the running frontend origin.
+- Previous stage: Implementation; earlier E2E attempt was blocked
+- Notes: User direction (2026-10-10), verbatim: `no, using RSA-3 handoff, just verify E2E pass and continue`. User reported E2E was fixed in RSA-4; treat that only as context that the earlier Cypress routing blocker may now be resolved on this RSA-3 worktree, not as test evidence. `project_skeleton.md` is absent. Root `.env` already has the Cypress admin variables and config loads them silently. Never print, copy, or record `.env` values. Set `CYPRESS_BASE_URL` to the running frontend origin.
+
+## Tester Retest (2026-10-10)
+
+- Branch verified: `feat/RSA-3-add-confirmation-button-admin`; the pre-existing handoff modification was preserved. No branch switch, staging, or commit performed.
+- Real stack verified with `docker compose ps`; frontend, backend, MongoDB, and Postgres were running. `GET http://localhost:8080/api/health` returned HTTP 200.
+- Initial Cypress invocation could not load `cypress.config.ts`: `ReferenceError: existsSync is not defined`. The config already parses root `.env` with `dotenv`; removed only the redundant calls to undefined `existsSync`/`loadEnvFile`. No application code or Cypress intercept behavior changed.
+- Ran from `frontend`: `set -a && . ../.env && set +a && CYPRESS_BASE_URL=http://localhost:8080 npm run e2e -- --spec cypress/e2e/admin.cy.ts`. Credentials were loaded silently and not recorded. This used the real local stack with no network stubs or mocks.
+- Setup and Admin navigation completed. Cypress result: 10 tests, 8 passing, 2 failing, 0 pending, 0 skipped. Failure 1: `Users > cancels a staged plan change without saving it`; after selecting `premium`, expected `Confirm plan change` button was not found (spec line 90). Failure 2: `Users > saves a staged plan change only after confirmation`; expected button was not found in the user row (spec line 103). The plan confirmation/cancellation requests and assertions did not run.
+- Expected result: selecting `premium` stages the change and shows the confirmation button at the end of that plan-change row; cancel sends no update and retains `standard`; confirm persists `premium`. The missing button means both behavior and placement remain unverified. This reproducer warrants implementation changes; tester made none.
+- `npm run build` from `frontend`: passed.
+- Outcome: `CHANGES_REQUESTED`. No credentials, response bodies, or secret values recorded.
 
 ## Implementation
+
+- Coder retest (2026-10-10):
+  - Updated `frontend/src/components/AdminView.tsx` so the plan dropdown and staged-plan actions share one row; confirmation and cancellation handlers remain unchanged.
+  - Updated `frontend/cypress/e2e/admin.cy.ts` to assert that the staged Premium dropdown and confirmation button share the plan row's `.table-actions` container.
+  - `cd frontend && npm run build`: passed.
+  - Rebuilt and restarted the real-stack frontend with `docker compose up -d --build frontend` so E2E exercised the edited UI.
+  - Loaded root `.env` silently and ran `CYPRESS_BASE_URL=http://localhost:8080 npm run e2e -- --spec cypress/e2e/admin.cy.ts` from `frontend` against the real app/backend without request stubs. Setup and Admin navigation completed; final run passed 10, failed 0, pending 0, skipped 0. Cancellation retained `standard` and sent no PATCH; confirmation persisted `premium`.
+  - `frontend/src/components/AdminView.tsx` has no editor errors. Existing `frontend/cypress.config.ts` change and all other pre-existing worktree state were preserved.
+  - Ready for tester retest.
 
 - Changed files: `frontend/src/components/AdminView.tsx`, `frontend/cypress/e2e/admin.cy.ts`, `frontend/cypress.config.ts`
 - `frontend/cypress/support/commands.ts` reports only expected/actual auth status and safe response metadata on setup failures; no response body or credential values.
@@ -75,9 +107,11 @@ Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
 
 ## Handoff
 
-Root `.env` already contains matching Cypress admin credentials, and Cypress config loads them without displaying values. Earlier runs saw synthetic `text/plain` 500 responses during registration/admin login, with no matching app access-log entries, while direct probes succeeded. Those results are historical; the latest report does not identify which current `beforeEach` stage fails. Confirmation and cancellation remain unverified.
+Latest result (2026-10-10): coder rebuilt the frontend container and reported all 10 Admin E2E cases passing. Tester independently reran the full Admin spec against the real stack: 10 passing, 0 failing/pending/skipped, Cypress exit status 0; setup, admin consent/login, and navigation completed. Cancellation retained `standard` with no PATCH; confirmation persisted `premium`, and its button shared the plan dropdown's row. Frontend build passed.
 
-Next action: run `admin.cy.ts` against the local stack and isolate the first failing `beforeEach` stage: registration; seeded chat/feedback; admin login/consent; or browser visit/Admin navigation. Fix Cypress setup only when the evidence supports that diagnosis, then rerun the spec and verify confirmation and cancellation over the real API. Do not stub or bypass requests with intercepts. Keep credential values, request/response bodies, and sensitive logs out of output and this handoff. Preserve all pre-existing staged and unstaged changes; do not switch branches, stage, reset, or discard files.
+Next action: @reviewer reviews RSA-3. Preserve all worktree state; do not switch branches, stage, reset, or discard files.
+
+Tester handoff: status is `READY_FOR_REVIEW`. Existing implementation, Cypress config/spec, and handoff changes were preserved.
 
 - Coder retest (2026-10-09):
   - Confirmed branch `feat/RSA-3-add-confirmation-button-admin`; retained existing staged/unstaged changes.

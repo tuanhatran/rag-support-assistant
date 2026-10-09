@@ -5,8 +5,6 @@ import { fileURLToPath } from 'node:url'
 const { parsed: rootEnv } = loadEnv({ path: fileURLToPath(new URL('../.env', import.meta.url)) })
 
 // CYPRESS_BASE_URL overrides baseUrl, for example http://localhost:5173 for the Vite dev server.
-const envFile = fileURLToPath(new URL('../.env', import.meta.url))
-if (existsSync(envFile)) loadEnvFile(envFile)
 
 export default defineConfig({
   env: {
