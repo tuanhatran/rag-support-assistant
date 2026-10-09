@@ -291,7 +291,9 @@ tr:last-child td { border-bottom: 0; }
 .endpoint-cell { max-width: 180px; overflow-wrap: anywhere; color: #68786d; }
 .key-hint { font: 10px var(--mono); color: #66796b; }.plan-badges { display: flex; gap: 4px; flex-wrap: wrap; }.plan-badge { padding: 3px 5px; border-radius: 2px; color: #5e7565; background: #eef3ed; font-size: 9px; text-transform: capitalize; }.plan-badge.premium { color: #865d27; background: #fbf1dd; }
 .table-actions { display: flex; gap: 2px; }.table-actions .icon-button { width: 28px; height: 28px; }
+.user-row-actions { display: flex; align-items: center; gap: 5px; white-space: nowrap; }.user-row-actions .button { min-height: 30px; padding: 0 8px; font-size: 10px; }
 .table-select { border: 1px solid #e0e6e0; border-radius: 2px; background: #fff; color: #48574d; min-height: 30px; padding: 0 7px; font-size: 10px; }
+.user-role { display: inline-block; color: #59675e; text-transform: capitalize; }
 .admin-user-label { display: inline-block; margin-left: 6px; color: #8c6e39; font: 8px var(--mono); }.missing-model { color: #b4513d; }
 .count-pill { padding: 6px 9px; border: 1px solid var(--line); color: #6c7a70; border-radius: 2px; font: 10px var(--mono); white-space: nowrap; }
 .compact-select { min-height: 36px; }.compact-select select { height: 34px; }.compact-select > span { color: #859188; }

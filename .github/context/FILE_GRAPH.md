@@ -83,7 +83,7 @@ Updated: 2026-10-08
 | `frontend/src/components/ChatView.tsx` | Sessions, composer, answers, sources, feedback |
 | `frontend/src/components/DocumentsView.tsx` | Search/filter and rendered runbooks |
 | `frontend/src/components/PrivacyView.tsx` | Policy, export, erase, account deletion |
-| `frontend/src/components/AdminView.tsx` | Connections, users, feedback, audit, ingestion routing |
+| `frontend/src/components/AdminView.tsx` | Connections, row-local staged user role/plan edits with per-row save locking, feedback, audit, ingestion routing |
 | `frontend/src/components/IngestionView.tsx` | Document upload form, chunking/model options, and pipeline history list |
 | `frontend/src/components/IngestionPipelineView.tsx` | Pipeline stage cards, polling, chunk inspector, extracted text, export payload |
 | `frontend/src/components/Markdown.tsx` | GFM Markdown rendering |
@@ -103,7 +103,7 @@ Updated: 2026-10-08
 | `frontend/cypress/e2e/chat.cy.ts` | AI Chat: suggestions, answers, sources, feedback, redaction, conversations |
 | `frontend/cypress/e2e/documents.cy.ts` | Documents: list, search, category, tag, reader |
 | `frontend/cypress/e2e/privacy.cy.ts` | Privacy: policy, export, erase, account deletion |
-| `frontend/cypress/e2e/admin.cy.ts` | Admin tabs, staged plan confirmation/cancellation (needs `CYPRESS_ADMIN_USERNAME` / `CYPRESS_ADMIN_PASSWORD`) |
+| `frontend/cypress/e2e/admin.cy.ts` | Admin tabs, user role/plan edit confirmation/cancellation, delayed-save locking and last-admin protection (needs `CYPRESS_ADMIN_USERNAME` / `CYPRESS_ADMIN_PASSWORD`) |
 | `frontend/cypress/e2e/rbac.cy.ts` | Admin guards, unauthenticated access, per-user conversation isolation |
 
 ## Operations
