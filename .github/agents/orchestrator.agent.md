@@ -38,7 +38,7 @@ Every new development task uses one new branch shared by planning, coding, testi
 | --- | --- | --- |
 | file missing | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>." plus the user's task description, verbatim. |
 | `BLOCKED` and the user supplied a new decision or description | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>." plus the user's message, verbatim. |
-| `USER_REQUEST_CHANGE` | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Incorporate the user's requirement changes recorded in the handoff." |
+| `USER_CHANGES_REQUESTED` | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Incorporate the user's requirement changes recorded in the handoff." |
 | `READY_FOR_CODE`, `CHANGES_REQUESTED` | `coder` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file." |
 | `READY_FOR_TEST` | `tester` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file." |
 | `READY_FOR_REVIEW` | `reviewer` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file." |
@@ -60,7 +60,7 @@ These match the `model` in each agent's own frontmatter. If the task file's rout
 ## Stop conditions
 
 - `Status` is `DONE` after the reviewer ran: report a short summary of the task, changed files, and test results.
-- If the reviewer asks whether requirements changed, wait for the user's answer. If yes, set/keep `USER_REQUEST_CHANGE` and route to `planner`; do not accept `DONE`. If no, reviewer may set `DONE`.
+- If the reviewer asks whether requirements changed, wait for the user's answer. If yes, set/keep `USER_CHANGES_REQUESTED` and route to `planner`; do not accept `DONE`. If no, reviewer may set `DONE`.
 - If the task is already `DONE` when starting, do not reopen it or reuse its branch for new work; ask the user to create a new task ID.
 - `Status` is `BLOCKED` with no new input from the user: stop and report the smallest decision the user must make.
 - The status did not change after a subagent ran, or the fix loop exceeds 3 rounds: stop and report which agent stalled.
