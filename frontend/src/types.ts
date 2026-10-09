@@ -128,6 +128,11 @@ export interface IngestionPipeline {
   expires_at: string | null
 }
 
+export type PipelineSummary = Pick<
+  IngestionPipeline,
+  'id' | 'filename' | 'file_size' | 'status' | 'options' | 'chunk_count' | 'error' | 'created_at' | 'expires_at'
+>
+
 export interface ChunkPreview {
   index: number
   content: string

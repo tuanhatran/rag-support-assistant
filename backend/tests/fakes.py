@@ -40,8 +40,15 @@ class FakeCursor:
     def __init__(self, documents: list[dict]):
         self.documents = documents
 
-    def sort(self, key: str, direction: int):
-        self.documents.sort(key=lambda item: _value(item, key) or "", reverse=direction < 0)
+    def sort(self, key: str | list, direction: int = 1):
+        if isinstance(key, list):
+            key, direction = key[0]
+        def _sort_key(item):
+            val = _value(item, key)
+            if val is None:
+                return (0, "")
+            return (1, val)
+        self.documents.sort(key=_sort_key, reverse=direction < 0)
         return self
 
     async def to_list(self, length: int | None = None):

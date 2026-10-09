@@ -25,6 +25,7 @@ from app.vectorstore import VectorStore
 
 MAX_STREAM_DECOMPRESSED_BYTES = 2 * 1024 * 1024  # 2 MB per stream
 MAX_TOTAL_DECOMPRESSED_BYTES = 8 * 1024 * 1024   # 8 MB cumulative per document
+MAX_PIPELINES_LIST = 50
 
 
 def parse_document(file_bytes: bytes, filename: str) -> str:
@@ -477,6 +478,28 @@ class IngestionService:
             "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
             "expires_at": doc.get("expires_at").isoformat() if doc.get("expires_at") else None,
         }
+
+    async def list_pipelines(self) -> list[dict[str, Any]]:
+        cursor = (
+            self.repos.db["ingestion_pipelines"]
+            .find({}, {"extracted_text": 0, "stages": 0})
+            .sort("created_at", -1)
+        )
+        docs = await cursor.to_list(length=MAX_PIPELINES_LIST)
+        return [
+            {
+                "id": str(doc["_id"]),
+                "filename": doc.get("filename", ""),
+                "file_size": doc.get("file_size", 0),
+                "status": doc.get("status", "queued"),
+                "options": doc.get("options", {}),
+                "chunk_count": doc.get("chunk_count", 0),
+                "error": doc.get("error"),
+                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+                "expires_at": doc.get("expires_at").isoformat() if doc.get("expires_at") else None,
+            }
+            for doc in docs
+        ]
 
     async def get_chunks_preview(self, pipeline_id: str) -> list[dict[str, Any]]:
         # Verify pipeline exists
