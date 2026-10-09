@@ -103,7 +103,7 @@ Updated: 2026-10-08
 | `frontend/cypress/e2e/chat.cy.ts` | AI Chat: suggestions, answers, sources, feedback, redaction, conversations |
 | `frontend/cypress/e2e/documents.cy.ts` | Documents: list, search, category, tag, reader |
 | `frontend/cypress/e2e/privacy.cy.ts` | Privacy: policy, export, erase, account deletion |
-| `frontend/cypress/e2e/admin.cy.ts` | Admin tabs (needs `CYPRESS_ADMIN_USERNAME` / `CYPRESS_ADMIN_PASSWORD`) |
+| `frontend/cypress/e2e/admin.cy.ts` | Admin tabs, staged plan confirmation/cancellation (needs `CYPRESS_ADMIN_USERNAME` / `CYPRESS_ADMIN_PASSWORD`) |
 | `frontend/cypress/e2e/rbac.cy.ts` | Admin guards, unauthenticated access, per-user conversation isolation |
 
 ## Operations
