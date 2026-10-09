@@ -18,6 +18,7 @@ class Repositories:
         self.feedback = database["chat_feedback"]
         self.connections = database["llm_connections"]
         self.audit_logs = database["audit_logs"]
+        self.ingestion_pipelines = database["ingestion_pipelines"]
 
     async def ensure_indexes(self) -> None:
         await self.users.create_index([("username", ASCENDING)], unique=True)
@@ -33,6 +34,8 @@ class Repositories:
         await self.audit_logs.create_index([("event", ASCENDING), ("timestamp", DESCENDING)])
         await self.audit_logs.create_index([("actor.username", ASCENDING), ("timestamp", DESCENDING)])
         await self.audit_logs.create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
+        await self.ingestion_pipelines.create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
+        await self.ingestion_pipelines.create_index([("created_at", DESCENDING)])
 
     async def get_user_by_username(self, username: str):
         return await self.users.find_one({"username": username.lower()})

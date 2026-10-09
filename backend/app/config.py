@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     conversation_retention_days: int = 90
     feedback_retention_days: int = 90
     audit_retention_days: int = 365
+    pgvector_dsn: str = ""
+    cloudflare_account_id: str = ""
+    cloudflare_api_token: str = ""
+    openai_api_key: str = ""
+    ingestion_retention_days: int = 90
 
 
 @lru_cache

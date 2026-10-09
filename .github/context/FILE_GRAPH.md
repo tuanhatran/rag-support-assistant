@@ -18,6 +18,9 @@ Updated: 2026-10-08
 | `backend/app/llm.py` | Prompt, simulator, OpenAI-compatible/Azure/Anthropic clients | plan-routed completion | `backend/tests/test_core.py` |
 | `backend/app/services.py` | Auth, chat, feedback, privacy, admin workflows | users, auth_sessions, chat_sessions, chat_feedback, llm_connections, audit_logs | `backend/tests/test_core.py`, `backend/tests/test_api.py` |
 | `backend/app/dependencies.py` | Container builder, session/RBAC/consent guards | auth/admin/data endpoint guards | `backend/tests/test_core.py`, `backend/tests/test_api.py` |
+| `backend/app/ingestion.py` | Parsing, chunking, option validation, pipeline orchestration | `ingestion_pipelines` | `backend/tests/test_ingestion.py` |
+| `backend/app/embeddings.py` | Embedding provider protocol and Cloudflare, local (fastembed), OpenAI providers | Embedding vectors | `backend/tests/test_ingestion.py` |
+| `backend/app/vectorstore.py` | pgvector store (psycopg async), schema bootstrap, sweep | PostgreSQL `document_chunks` | `backend/tests/test_ingestion.py` |
 
 ## Backend Tests
 
@@ -26,6 +29,7 @@ Updated: 2026-10-08
 | `backend/tests/fakes.py` | In-memory collection/query/update behavior for API tests |
 | `backend/tests/test_core.py` | Retrieval, redaction, hashing, policy and model provider protocols |
 | `backend/tests/test_api.py` | Session lifecycle, cookie flags, consent, RBAC, request IDs, user isolation, last-admin protection |
+| `backend/tests/test_ingestion.py` | Chunking, parsing, redaction, embedding providers, pipeline orchestration, admin endpoints, vectorstore sweep |
 
 ## Backend Routes
 
@@ -37,6 +41,7 @@ Updated: 2026-10-08
 | `routers/documents.py` | searchable document list and document details | `KnowledgeBase` |
 | `routers/privacy.py` | policy, consent, export, erase, account deletion | `PrivacyService` |
 | `routers/admin.py` | connections, test, users, feedback/stats, audit | `AdminService` |
+| `routers/ingestion.py` | options, pipelines, pipeline detail, chunks | `IngestionService` |
 
 ## Collections
 
@@ -48,6 +53,8 @@ Updated: 2026-10-08
 | `chat_feedback` | Feedback/Admin/Privacy | unique `(session_id, message_id)`, TTL `expires_at` |
 | `llm_connections` | Admin/Chat | unique name, plans |
 | `audit_logs` | Audit/Admin | timestamp, event/actor timestamp, TTL `expires_at` |
+| `ingestion_pipelines` (Mongo) | Ingestion/Admin | TTL `expires_at`, `created_at` |
+| `document_chunks` (PostgreSQL) | Ingestion/VectorStore | `pipeline_id`, `expires_at` |
 
 ## Knowledge Base
 
@@ -76,7 +83,9 @@ Updated: 2026-10-08
 | `frontend/src/components/ChatView.tsx` | Sessions, composer, answers, sources, feedback |
 | `frontend/src/components/DocumentsView.tsx` | Search/filter and rendered runbooks |
 | `frontend/src/components/PrivacyView.tsx` | Policy, export, erase, account deletion |
-| `frontend/src/components/AdminView.tsx` | Connections, users, feedback, audit |
+| `frontend/src/components/AdminView.tsx` | Connections, users, feedback, audit, ingestion routing |
+| `frontend/src/components/IngestionView.tsx` | Document upload form and chunking/model options |
+| `frontend/src/components/IngestionPipelineView.tsx` | Pipeline stage cards, polling, chunk inspector, extracted text, export payload |
 | `frontend/src/components/Markdown.tsx` | GFM Markdown rendering |
 | `frontend/src/styles.css` | Responsive application styling |
 
