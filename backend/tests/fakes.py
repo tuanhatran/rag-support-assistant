@@ -103,7 +103,14 @@ class FakeCollection:
 
 def _apply_update(document: dict, update: dict):
     for key, values in update.get("$set", {}).items():
-        document[key] = copy.deepcopy(values)
+        if "." in key:
+            parts = key.split(".")
+            target = document
+            for part in parts[:-1]:
+                target = target.setdefault(part, {})
+            target[parts[-1]] = copy.deepcopy(values)
+        else:
+            document[key] = copy.deepcopy(values)
     for key, value in update.get("$push", {}).items():
         document.setdefault(key, []).append(copy.deepcopy(value))
     for key, value in update.get("$pull", {}).items():

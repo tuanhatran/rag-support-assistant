@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
@@ -11,11 +12,13 @@ from pymongo import AsyncMongoClient
 from app.audit import AuditService
 from app.config import Settings
 from app.errors import AuthenticationError, AuthorizationError, ValidationError
+from app.ingestion import IngestionService
 from app.observability import request_context
 from app.rag import KnowledgeBase
 from app.repositories import Repositories, seed_connection, utcnow
 from app.security import hash_password, hash_token
 from app.services import AdminService, AuthService, ChatService, FeedbackService, PrivacyService
+from app.vectorstore import PgVectorStore, UnconfiguredVectorStore, VectorStore
 
 
 @dataclass
@@ -30,24 +33,41 @@ class Container:
     feedback: FeedbackService
     privacy: PrivacyService
     admin: AdminService
+    vectorstore: VectorStore
+    ingestion: IngestionService
 
 
-def build_container(settings: Settings, database=None, client=None) -> Container:
+def build_container(settings: Settings, database=None, client=None, vectorstore: VectorStore | None = None) -> Container:
     if database is None:
         client = client or AsyncMongoClient(settings.mongo_uri, serverSelectionTimeoutMS=3000)
         database = client[settings.mongo_db]
     repos = Repositories(database)
     audit = AuditService(repos, settings.audit_retention_days)
     knowledge = KnowledgeBase(Path(__file__).parent / "data" / "documents", settings.retrieval_top_k)
+    if vectorstore is None:
+        if settings.pgvector_dsn:
+            vectorstore = PgVectorStore(settings.pgvector_dsn)
+        else:
+            vectorstore = UnconfiguredVectorStore()
+    ingestion = IngestionService(repos, settings, audit, vectorstore)
     return Container(client, repos, settings, knowledge, audit,
                      AuthService(repos, settings, audit), ChatService(repos, settings, knowledge, audit),
                      FeedbackService(repos, settings, audit), PrivacyService(repos, settings, audit),
-                     AdminService(repos, settings, audit))
+                     AdminService(repos, settings, audit),
+                     vectorstore, ingestion)
 
 
 async def initialize_container(container: Container) -> None:
     await container.repos.ensure_indexes()
     await seed_connection(container.repos)
+    await container.ingestion.mark_interrupted_on_startup()
+    if container.settings.pgvector_dsn and isinstance(container.vectorstore, PgVectorStore):
+        try:
+            await container.vectorstore.bootstrap()
+        except Exception as exc:
+            logging.getLogger("app.vectorstore").warning(
+                "Failed to bootstrap pgvector schema: %s", exc.__class__.__name__
+            )
     if container.settings.bootstrap_admin_password:
         username = container.settings.bootstrap_admin_username.strip().lower()
         if not await container.repos.get_user_by_username(username):

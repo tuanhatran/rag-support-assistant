@@ -10,6 +10,21 @@ services:
       timeout: 3s
       retries: 20
 
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rag_support}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-rag_support}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   backend:
     build: ./backend
     restart: unless-stopped
@@ -30,8 +45,15 @@ services:
       RAG_CONVERSATION_RETENTION_DAYS: ${RAG_CONVERSATION_RETENTION_DAYS:-90}
       RAG_FEEDBACK_RETENTION_DAYS: ${RAG_FEEDBACK_RETENTION_DAYS:-90}
       RAG_AUDIT_RETENTION_DAYS: ${RAG_AUDIT_RETENTION_DAYS:-365}
+      RAG_PGVECTOR_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-rag_support}
+      RAG_CLOUDFLARE_ACCOUNT_ID: ${RAG_CLOUDFLARE_ACCOUNT_ID:-}
+      RAG_CLOUDFLARE_API_TOKEN: ${RAG_CLOUDFLARE_API_TOKEN:-}
+      RAG_OPENAI_API_KEY: ${RAG_OPENAI_API_KEY:-}
+      RAG_INGESTION_RETENTION_DAYS: ${RAG_INGESTION_RETENTION_DAYS:-90}
     depends_on:
       mongo:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
 
   frontend:
@@ -43,4 +65,5 @@ services:
       - backend
 
 volumes:
-  mongo-data:/home/thtran/rag-support-db
+  mongo-data:
+  pg-data:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -10,21 +11,47 @@ from app.config import Settings, get_settings
 from app.dependencies import build_container, initialize_container
 from app.errors import AuthenticationError, AuthorizationError, ConfigurationError, NotFoundError, ValidationError
 from app.observability import RequestContextMiddleware, configure_logging
-from app.routers import admin, auth, chat, documents, feedback, privacy
+from app.routers import admin, auth, chat, documents, feedback, ingestion, privacy
+from app.vectorstore import VectorStore
 
 
-def create_app(settings: Settings | None = None, database=None, initialize: bool = True) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    database=None,
+    initialize: bool = True,
+    vectorstore: VectorStore | None = None,
+) -> FastAPI:
     settings = settings or get_settings()
-    container = build_container(settings, database=database)
+    container = build_container(settings, database=database, vectorstore=vectorstore)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         configure_logging(force=True, level=settings.log_level, log_format=settings.log_format)
         if initialize:
             await initialize_container(container)
-        yield
-        if container.client:
-            await container.client.close()
+
+        async def sweep_loop():
+            while True:
+                try:
+                    await asyncio.sleep(3600)
+                    if hasattr(container.vectorstore, "sweep_expired"):
+                        await container.vectorstore.sweep_expired()
+                except asyncio.CancelledError:
+                    break
+                except Exception as exc:
+                    logging.getLogger("app.vectorstore").warning("Error during vectorstore sweep: %s", exc)
+
+        sweep_task = asyncio.create_task(sweep_loop())
+        try:
+            yield
+        finally:
+            sweep_task.cancel()
+            try:
+                await sweep_task
+            except asyncio.CancelledError:
+                pass
+            if container.client:
+                await container.client.close()
 
     app = FastAPI(title="RAG Support Assistant", version="1.0.0", lifespan=lifespan)
     app.state.container = container
@@ -35,6 +62,7 @@ def create_app(settings: Settings | None = None, database=None, initialize: bool
     app.include_router(feedback.router, prefix="/api")
     app.include_router(privacy.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
+    app.include_router(ingestion.router, prefix="/api")
 
     @app.exception_handler(AuthenticationError)
     async def authentication_error(request: Request, exc: AuthenticationError):
