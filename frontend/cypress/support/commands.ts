@@ -28,13 +28,22 @@ declare global {
 function signIn({ username, password }: Credentials) {
   // Status is asserted instead of failOnStatusCode so a failure never prints the request body.
   cy.request({ method: 'POST', url: '/api/auth/login', body: { username, password }, log: false, failOnStatusCode: false })
-    .its('status').should('eq', 200)
+    .then(response => assertStatus(response, 200))
+}
+
+function assertStatus(response: Cypress.Response<unknown>, expected: number) {
+  if (response.status === expected) return
+  const requestIdHeader = Object.entries(response.headers).find(([name]) => name.toLowerCase() === 'x-request-id')?.[1]
+  const requestId = typeof requestIdHeader === 'string' ? requestIdHeader : 'unavailable'
+  const server = response.headers.server ?? 'unavailable'
+  const contentType = response.headers['content-type'] ?? 'unavailable'
+  throw new Error(`Expected HTTP ${expected}, received ${response.status}; request ID ${requestId}; URL ${response.url}; server ${server}; content type ${contentType}`)
 }
 
 Cypress.Commands.add('registerUser', (plan: Plan = 'standard') => {
   const credentials = newCredentials()
   cy.request({ method: 'POST', url: '/api/auth/register', body: { ...credentials, plan, policy_accepted: true }, log: false, failOnStatusCode: false })
-    .its('status').should('eq', 201)
+    .then(response => assertStatus(response, 201))
   return cy.wrap(credentials, { log: false })
 })
 

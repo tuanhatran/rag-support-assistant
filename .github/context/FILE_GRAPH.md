@@ -93,7 +93,7 @@ Updated: 2026-10-08
 
 | File | Responsibility |
 | --- | --- |
-| `frontend/cypress.config.ts` | Base URL `http://localhost:8080`, spec and support paths |
+| `frontend/cypress.config.ts` | Loads root `.env` for Cypress credentials, base URL `http://localhost:8080`, spec and support paths |
 | `frontend/cypress/tsconfig.json` | Cypress-only TypeScript project, outside the app `tsc -b` |
 | `frontend/cypress/support/e2e.ts` | Support entry, loads commands |
 | `frontend/cypress/support/helpers.ts` | Unique credentials, admin env credentials, admin skip guard |
@@ -103,7 +103,7 @@ Updated: 2026-10-08
 | `frontend/cypress/e2e/chat.cy.ts` | AI Chat: suggestions, answers, sources, feedback, redaction, conversations |
 | `frontend/cypress/e2e/documents.cy.ts` | Documents: list, search, category, tag, reader |
 | `frontend/cypress/e2e/privacy.cy.ts` | Privacy: policy, export, erase, account deletion |
-| `frontend/cypress/e2e/admin.cy.ts` | Admin tabs (needs `CYPRESS_ADMIN_USERNAME` / `CYPRESS_ADMIN_PASSWORD`) |
+| `frontend/cypress/e2e/admin.cy.ts` | Admin tabs, staged plan confirmation/cancellation (needs `CYPRESS_ADMIN_USERNAME` / `CYPRESS_ADMIN_PASSWORD`) |
 | `frontend/cypress/e2e/rbac.cy.ts` | Admin guards, unauthenticated access, per-user conversation isolation |
 
 ## Operations

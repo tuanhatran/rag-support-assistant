@@ -18,6 +18,7 @@ export function AdminView() {
   const [tab, setTab] = useState<AdminTab>('connections')
   const [connections, setConnections] = useState<Connection[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [pendingPlans, setPendingPlans] = useState<Record<string, Plan>>({})
   const [feedback, setFeedback] = useState<Feedback[]>([])
   const [stats, setStats] = useState({ total: 0, helpful: 0, not_helpful: 0, satisfaction_percent: 0 })
   const [audit, setAudit] = useState<AuditEntry[]>([])
@@ -78,9 +79,16 @@ export function AdminView() {
     catch (reason) { fail(reason) }
   }
 
-  async function updateUser(user: AdminUser, changes: { role?: AdminUser['role']; plan?: Plan }) {
-    try { await api.patch(`/admin/users/${user.id}`, changes); setNotice(`Updated ${user.username}.`); await loadUsers() }
-    catch (reason) { fail(reason) }
+  async function updateUser(user: AdminUser, changes: { role?: AdminUser['role']; plan?: Plan }): Promise<boolean> {
+    try { await api.patch(`/admin/users/${user.id}`, changes); setNotice(`Updated ${user.username}.`); await loadUsers(); return true }
+    catch (reason) { fail(reason); return false }
+  }
+
+  async function confirmPlanChange(user: AdminUser) {
+    const plan = pendingPlans[user.id]
+    if (plan && await updateUser(user, { plan })) {
+      setPendingPlans(current => { const next = { ...current }; delete next[user.id]; return next })
+    }
   }
 
   async function submitAudit(event: FormEvent) { event.preventDefault(); try { await loadAudit() } catch (reason) { fail(reason) } }
@@ -117,7 +125,7 @@ export function AdminView() {
       )
     )}
 
-    {tab === 'users' && <section className="admin-section"><div className="section-toolbar"><div><span className="eyebrow">IDENTITY &amp; ACCESS</span><h2>User accounts</h2><p>Change a user's support plan or role. The last admin cannot be demoted.</p></div><span className="count-pill">{users.length} accounts</span></div><div className="table-wrap"><table><thead><tr><th>Username</th><th>Role</th><th>Plan</th><th>Created</th><th>Model assignment</th></tr></thead><tbody>{users.map(user => { const assigned = connections.find(connection => connection.plans.includes(user.plan)); return <tr key={user.id}><td><b className="table-primary">{user.username}</b>{user.role === 'admin' && <span className="admin-user-label">ADMIN</span>}</td><td><label className="sr-only" htmlFor={`role-${user.id}`}>Role for {user.username}</label><select id={`role-${user.id}`} className="table-select" value={user.role} onChange={event => updateUser(user, { role: event.target.value as AdminUser['role'] })}><option value="user">User</option><option value="admin">Admin</option></select></td><td><label className="sr-only" htmlFor={`plan-${user.id}`}>Plan for {user.username}</label><select id={`plan-${user.id}`} className="table-select" value={user.plan} onChange={event => updateUser(user, { plan: event.target.value as Plan })}>{planLabels.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</select></td><td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}</td><td>{assigned ? <span>{assigned.model}</span> : <span className="missing-model">No model assigned</span>}</td></tr> })}</tbody></table></div></section>}
+    {tab === 'users' && <section className="admin-section"><div className="section-toolbar"><div><span className="eyebrow">IDENTITY &amp; ACCESS</span><h2>User accounts</h2><p>Change a user's support plan or role. The last admin cannot be demoted.</p></div><span className="count-pill">{users.length} accounts</span></div><div className="table-wrap"><table><thead><tr><th>Username</th><th>Role</th><th>Plan</th><th>Created</th><th>Model assignment</th></tr></thead><tbody>{users.map(user => { const assigned = connections.find(connection => connection.plans.includes(user.plan)); const pendingPlan = pendingPlans[user.id]; return <tr key={user.id}><td><b className="table-primary">{user.username}</b>{user.role === 'admin' && <span className="admin-user-label">ADMIN</span>}</td><td><label className="sr-only" htmlFor={`role-${user.id}`}>Role for {user.username}</label><select id={`role-${user.id}`} className="table-select" value={user.role} onChange={event => updateUser(user, { role: event.target.value as AdminUser['role'] })}><option value="user">User</option><option value="admin">Admin</option></select></td><td><label className="sr-only" htmlFor={`plan-${user.id}`}>Plan for {user.username}</label><select id={`plan-${user.id}`} className="table-select" value={pendingPlan ?? user.plan} onChange={event => { const plan = event.target.value as Plan; setPendingPlans(current => { const next = { ...current }; if (plan === user.plan) delete next[user.id]; else next[user.id] = plan; return next }) }}>{planLabels.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</select>{pendingPlan && <div className="table-actions"><button className="button button-primary" onClick={() => confirmPlanChange(user)}>Confirm plan change</button><button className="button" onClick={() => setPendingPlans(current => { const next = { ...current }; delete next[user.id]; return next })}>Cancel</button></div>}</td><td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}</td><td>{assigned ? <span>{assigned.model}</span> : <span className="missing-model">No model assigned</span>}</td></tr> })}</tbody></table></div></section>}
 
     {tab === 'feedback' && <section className="admin-section"><div className="section-toolbar"><div><span className="eyebrow">ANSWER QUALITY</span><h2>Chat feedback</h2><p>Review ratings and user comments on generated answers.</p></div><label className="select-wrap compact-select"><span>Rating</span><select value={rating} onChange={event => setRating(event.target.value)}><option value="">All ratings</option><option value="up">Helpful</option><option value="down">Not helpful</option></select><ChevronDown size={14} /></label></div><div className="stats-strip">{[['TOTAL RATINGS', stats.total], ['HELPFUL', stats.helpful], ['NOT HELPFUL', stats.not_helpful], ['SATISFACTION', `${stats.satisfaction_percent}%`]].map(([label, value]) => <div className="stat-cell" key={label}><span>{label}</span><b>{value}</b></div>)}</div><div className="feedback-cards">{feedback.map(item => <article className="feedback-card" key={`${item.session_id}-${item.message_id}`}><div className="feedback-card-head"><span className={`rating-pill ${item.rating}`}>{item.rating === 'up' ? 'Helpful' : 'Not helpful'}</span><span>{item.username}</span><span>{new Date(item.created_at).toLocaleString()}</span><span className="feedback-model">{item.model?.model}</span></div><div className="feedback-exchange"><b>Question</b><p>{item.question}</p><b>Answer</b><p>{item.answer}</p></div>{item.categories.length > 0 && <div className="feedback-category-row">{item.categories.map(value => <span className="feedback-category" key={value}>{value.replace('_', ' ')}</span>)}</div>}{item.comment && <blockquote>{item.comment}</blockquote>}</article>)}{feedback.length === 0 && <div className="table-empty">No feedback matches this filter.</div>}</div></section>}
 

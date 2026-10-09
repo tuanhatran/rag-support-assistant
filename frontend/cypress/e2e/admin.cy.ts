@@ -84,10 +84,27 @@ describe('Admin screen', () => {
   describe('Users', () => {
     beforeEach(() => openTab('Users'))
 
-    it('changes the plan of a user', () => {
+    it('cancels a staged plan change without saving it', () => {
+      cy.intercept('PATCH', '/api/admin/users/*').as('updateUser')
       cy.contains('tr', user.username).find('select').eq(1).select('premium')
+      cy.contains('button', 'Confirm plan change').should('be.visible')
+      cy.request('/api/admin/users').its('body').then((users: { username: string; plan: string }[]) => {
+        expect(users.find(item => item.username === user.username)?.plan).to.equal('standard')
+      })
+      cy.contains('tr', user.username).contains('button', 'Cancel').click()
+      cy.contains('tr', user.username).find('select').eq(1).should('have.value', 'standard')
+      cy.contains('tr', user.username).contains('button', 'Confirm plan change').should('not.exist')
+      cy.get('@updateUser.all').should('have.length', 0)
+    })
+
+    it('saves a staged plan change only after confirmation', () => {
+      cy.intercept('PATCH', '/api/admin/users/*').as('updateUser')
+      cy.contains('tr', user.username).find('select').eq(1).select('premium')
+      cy.contains('tr', user.username).contains('button', 'Confirm plan change').click()
+      cy.wait('@updateUser').its('response.statusCode').should('eq', 200)
       cy.get('.page-alert').should('contain', `Updated ${user.username}.`)
       cy.contains('tr', user.username).find('select').eq(1).should('have.value', 'premium')
+      cy.contains('tr', user.username).contains('button', 'Confirm plan change').should('not.exist')
     })
 
     it('refuses to demote the last admin', () => {
