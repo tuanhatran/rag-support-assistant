@@ -398,6 +398,126 @@ def test_pipeline_api_lifecycle(fake_container):
             assert "embedding" not in chunk
 
 
+def test_list_pipelines_endpoint(fake_container):
+    app, database, _ = fake_container
+
+    # 1. Non-admin rejection
+    with TestClient(app) as client:
+        # Unauthenticated
+        resp = client.get("/api/admin/ingestion/pipelines")
+        assert resp.status_code == 401
+
+        # Non-admin user
+        session_id = make_normal_user(database)
+        client.cookies.set("rag-support-assistant", session_id)
+        resp = client.get("/api/admin/ingestion/pipelines")
+        assert resp.status_code == 403
+
+    # 2. Seed pipelines with different created_at dates
+    now = utcnow()
+    p1 = ObjectId()
+    p2 = ObjectId()
+    p3 = ObjectId()
+    database["ingestion_pipelines"].documents.extend([
+        {
+            "_id": p1,
+            "filename": "older.txt",
+            "file_size": 100,
+            "status": "completed",
+            "options": {"chunk_size": 500, "chunk_overlap": 50, "separator": "\n\n", "embedding_model": "@cf/baai/bge-small-en-v1.5"},
+            "stages": {"file_parsing": {"status": "done", "latency_ms": 10}},
+            "chunk_count": 3,
+            "extracted_text": "Sensitive extracted text that must not leak",
+            "error": None,
+            "created_at": now - timedelta(hours=2),
+            "updated_at": now - timedelta(hours=2),
+            "expires_at": now + timedelta(days=90),
+        },
+        {
+            "_id": p2,
+            "filename": "newest.txt",
+            "file_size": 200,
+            "status": "running",
+            "options": {"chunk_size": 400, "chunk_overlap": 40, "separator": "\n", "embedding_model": "@cf/baai/bge-small-en-v1.5"},
+            "stages": {"file_parsing": {"status": "running", "latency_ms": 5}},
+            "chunk_count": 0,
+            "extracted_text": "Another secret extracted text",
+            "error": None,
+            "created_at": now,
+            "updated_at": now,
+            "expires_at": now + timedelta(days=90),
+        },
+        {
+            "_id": p3,
+            "filename": "middle.txt",
+            "file_size": 150,
+            "status": "failed",
+            "options": {"chunk_size": 500, "chunk_overlap": 50, "separator": "\n\n", "embedding_model": "@cf/baai/bge-small-en-v1.5"},
+            "stages": {"file_parsing": {"status": "failed", "latency_ms": 1}},
+            "chunk_count": 0,
+            "extracted_text": "Failed text",
+            "error": "Decompression limit",
+            "created_at": now - timedelta(hours=1),
+            "updated_at": now - timedelta(hours=1),
+            "expires_at": now + timedelta(days=90),
+        },
+    ])
+
+    admin_session_id = make_admin(database)
+    with TestClient(app) as client:
+        client.cookies.set("rag-support-assistant", admin_session_id)
+        resp = client.get("/api/admin/ingestion/pipelines")
+        assert resp.status_code == 200
+        items = resp.json()
+        assert isinstance(items, list)
+        assert len(items) == 3
+
+        # Newest-first ordering
+        assert items[0]["id"] == str(p2)
+        assert items[0]["filename"] == "newest.txt"
+        assert items[1]["id"] == str(p3)
+        assert items[1]["filename"] == "middle.txt"
+        assert items[2]["id"] == str(p1)
+        assert items[2]["filename"] == "older.txt"
+
+        # extracted_text and stages must NOT be included
+        for item in items:
+            assert "extracted_text" not in item
+            assert "stages" not in item
+            # Verify required fields are present
+            assert "id" in item
+            assert "filename" in item
+            assert "file_size" in item
+            assert "status" in item
+            assert "options" in item
+            assert "chunk_count" in item
+            assert "error" in item
+            assert "created_at" in item
+            assert "expires_at" in item
+
+        # Verify cap at MAX_PIPELINES_LIST (50)
+        extra_docs = [
+            {
+                "_id": ObjectId(),
+                "filename": f"extra_{i}.txt",
+                "file_size": 50,
+                "status": "completed",
+                "options": {},
+                "chunk_count": 1,
+                "extracted_text": "text",
+                "error": None,
+                "created_at": now + timedelta(seconds=i + 1),
+                "updated_at": now + timedelta(seconds=i + 1),
+                "expires_at": now + timedelta(days=90),
+            }
+            for i in range(60)
+        ]
+        database["ingestion_pipelines"].documents.extend(extra_docs)
+        resp_cap = client.get("/api/admin/ingestion/pipelines")
+        assert resp_cap.status_code == 200
+        assert len(resp_cap.json()) == 50
+
+
 # =========================================================================
 # Pipeline Execution & Background Flow Tests
 # =========================================================================

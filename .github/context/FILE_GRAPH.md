@@ -41,7 +41,7 @@ Updated: 2026-10-08
 | `routers/documents.py` | searchable document list and document details | `KnowledgeBase` |
 | `routers/privacy.py` | policy, consent, export, erase, account deletion | `PrivacyService` |
 | `routers/admin.py` | connections, test, users, feedback/stats, audit | `AdminService` |
-| `routers/ingestion.py` | options, pipelines, pipeline detail, chunks | `IngestionService` |
+| `routers/ingestion.py` | options, pipelines (list/create), pipeline detail, chunks | `IngestionService` |
 
 ## Collections
 
@@ -84,7 +84,7 @@ Updated: 2026-10-08
 | `frontend/src/components/DocumentsView.tsx` | Search/filter and rendered runbooks |
 | `frontend/src/components/PrivacyView.tsx` | Policy, export, erase, account deletion |
 | `frontend/src/components/AdminView.tsx` | Connections, users, feedback, audit, ingestion routing |
-| `frontend/src/components/IngestionView.tsx` | Document upload form and chunking/model options |
+| `frontend/src/components/IngestionView.tsx` | Document upload form, chunking/model options, and pipeline history list |
 | `frontend/src/components/IngestionPipelineView.tsx` | Pipeline stage cards, polling, chunk inspector, extracted text, export payload |
 | `frontend/src/components/Markdown.tsx` | GFM Markdown rendering |
 | `frontend/src/styles.css` | Responsive application styling |

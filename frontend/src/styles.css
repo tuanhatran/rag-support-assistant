@@ -354,6 +354,20 @@ td code { color: #506b58; font: 9px var(--mono); }.request-id { max-width: 110px
 .ingestion-actions { display: flex; justify-content: flex-end; padding-top: 10px; }
 .submit-ingestion-btn { min-height: 38px; padding: 0 24px; font-size: 12px; font-weight: 600; }
 
+/* Ingestion History Section */
+.ingestion-history-section { margin-top: 32px; border-top: 1px solid #e3eae3; padding-top: 22px; display: flex; flex-direction: column; gap: 14px; }
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.history-row-btn { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; background: #fff; border: 1px solid #dbe4dc; border-radius: 4px; cursor: pointer; text-align: left; width: 100%; transition: border-color .15s, background-color .15s; font: inherit; }
+.history-row-btn:hover { border-color: var(--green); background: #f9fbf9; }
+.history-row-btn:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.history-row-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.history-row-icon { color: #5a7061; flex-shrink: 0; }
+.history-row-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.history-row-filename { font-weight: 600; font-size: 12px; color: #23392a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-row-date { font: 10px var(--mono); color: #7f8e83; }
+.history-row-meta { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.history-row-chunks { font: 10px var(--mono); color: #526657; }
+
 /* Pipeline Detail Page */
 .pipeline-detail-view { display: flex; flex-direction: column; gap: 18px; }
 .pipeline-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 1px solid #e6ece6; padding-bottom: 14px; }

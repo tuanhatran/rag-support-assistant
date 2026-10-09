@@ -1,7 +1,7 @@
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useState } from 'react'
-import { ArrowRight, CheckCircle2, ChevronDown, Cpu, FileText, Layers, Sparkles, Upload, UploadCloud } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronDown, Cpu, FileText, Layers, RefreshCw, Sparkles, Upload, UploadCloud } from 'lucide-react'
 import { api } from '../api'
-import type { EmbeddingModelOption, IngestionOptions } from '../types'
+import type { EmbeddingModelOption, IngestionOptions, PipelineSummary } from '../types'
 
 interface IngestionViewProps {
   onOpenPipeline: (pipelineId: string) => void
@@ -20,6 +20,22 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submittedPipelineId, setSubmittedPipelineId] = useState<string | null>(null)
+  const [history, setHistory] = useState<PipelineSummary[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(true)
+  const [historyError, setHistoryError] = useState('')
+
+  async function loadHistory() {
+    setLoadingHistory(true)
+    setHistoryError('')
+    try {
+      const data = await api.get<PipelineSummary[]>('/admin/ingestion/pipelines')
+      setHistory(data)
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : 'Failed to load ingestion history')
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
 
   useEffect(() => {
     api.get<IngestionOptions>('/admin/ingestion/options')
@@ -32,6 +48,8 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
         }
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load options'))
+
+    loadHistory()
   }, [])
 
   function validateAndSelectFile(selected: File | null) {
@@ -94,6 +112,7 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
         formData
       )
       setSubmittedPipelineId(result.id)
+      loadHistory()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start ingestion pipeline')
     } finally {
@@ -279,6 +298,65 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
           </button>
         </div>
       </form>
+
+      <div className="ingestion-history-section">
+        <div className="section-toolbar">
+          <div>
+            <span className="eyebrow">PIPELINE HISTORY</span>
+            <h3>History</h3>
+            <p>Previous document ingestion pipelines and processing status.</p>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            title="Refresh history"
+            aria-label="Refresh ingestion history"
+            onClick={loadHistory}
+          >
+            <RefreshCw size={15} />
+          </button>
+        </div>
+
+        {historyError && (
+          <div className="form-error page-alert">
+            {historyError}
+            <button className="icon-button" aria-label="Dismiss error" onClick={() => setHistoryError('')}>X</button>
+          </div>
+        )}
+
+        {loadingHistory ? (
+          <div className="table-empty">Loading ingestion history...</div>
+        ) : history.length === 0 ? (
+          !historyError && <div className="table-empty">No ingestion pipelines yet.</div>
+        ) : (
+          <div className="history-list">
+            {history.map(item => (
+              <button
+                key={item.id}
+                type="button"
+                className="history-row-btn"
+                onClick={() => onOpenPipeline(item.id)}
+              >
+                <span className="history-row-main">
+                  <FileText size={16} className="history-row-icon" />
+                  <span className="history-row-info">
+                    <span className="history-row-filename">{item.filename}</span>
+                    <span className="history-row-date">
+                      {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
+                    </span>
+                  </span>
+                </span>
+                <span className="history-row-meta">
+                  <span className="history-row-chunks">
+                    {item.chunk_count} {item.chunk_count === 1 ? 'chunk' : 'chunks'}
+                  </span>
+                  <span className={`status-pill ${item.status}`}>{item.status}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   )
 }

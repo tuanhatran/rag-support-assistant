@@ -67,6 +67,12 @@ async def create_pipeline(
     )
 
 
+@router.get("/pipelines")
+async def list_pipelines(request: Request, user=Depends(require_admin)):
+    container = request.app.state.container
+    return await container.ingestion.list_pipelines()
+
+
 @router.get("/pipelines/{pipeline_id}")
 async def get_pipeline_details(
     pipeline_id: str, request: Request, user=Depends(require_admin)
