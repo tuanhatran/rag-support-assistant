@@ -24,7 +24,7 @@ Each task has its own handoff file `.github/handoff/tasks/<TASK-ID>.md`, where `
 
 Every new development task uses one new branch shared by planning, coding, testing, and review.
 
-- If the task handoff already has a `Branch` value, reuse that branch and do not ask for another name. Before resuming, check `git status --short`. If the worktree is clean and the recorded branch exists, switch to it when needed. If the worktree is dirty or the recorded branch is missing, stop and ask the user how to proceed; never create a replacement branch for an in-progress task.
+- If the task handoff already has a `Branch` value, reuse that branch and do not ask for another name. Before resuming, check the current branch and `git status --short`. If already on the recorded branch, allow only the new active handoff file staged by planner (`A  .github/handoff/tasks/<TASK-ID>.md`); any other dirty state stops the run. Switch branches only from a fully clean worktree. If the recorded branch is missing, stop and ask the user how to proceed; never create a replacement branch for an in-progress task.
 - If the task is new or its handoff has no `Branch` value, ask the user for a branch name and wait before dispatching any subagent. Accept only names containing letters, digits, `.`, `_`, `/`, or `-`; validate with `git check-ref-format --branch "<branch-name>"`. Require a clean worktree and a name not already in use, then create it with `git switch -c "<branch-name>"`.
 - Pass the branch name to the planner or resumed-stage subagent. The planner records it in the handoff. For a legacy handoff missing `Branch`, the dispatched subagent must add the supplied branch value before doing its stage work.
 - If a subagent is invoked directly, it follows the same setup protocol in `.github/copilot-instructions.md`.
@@ -38,6 +38,7 @@ Every new development task uses one new branch shared by planning, coding, testi
 | --- | --- | --- |
 | file missing | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>." plus the user's task description, verbatim. |
 | `BLOCKED` and the user supplied a new decision or description | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>." plus the user's message, verbatim. |
+| `USER_REQUEST_CHANGE` | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Incorporate the user's requirement changes recorded in the handoff." |
 | `READY_FOR_CODE`, `CHANGES_REQUESTED` | `coder` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file." |
 | `READY_FOR_TEST` | `tester` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file." |
 | `READY_FOR_REVIEW` | `reviewer` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file." |
@@ -59,6 +60,7 @@ These match the `model` in each agent's own frontmatter. If the task file's rout
 ## Stop conditions
 
 - `Status` is `DONE` after the reviewer ran: report a short summary of the task, changed files, and test results.
+- If the reviewer asks whether requirements changed, wait for the user's answer. If yes, set/keep `USER_REQUEST_CHANGE` and route to `planner`; do not accept `DONE`. If no, reviewer may set `DONE`.
 - If the task is already `DONE` when starting, do not reopen it or reuse its branch for new work; ask the user to create a new task ID.
 - `Status` is `BLOCKED` with no new input from the user: stop and report the smallest decision the user must make.
 - The status did not change after a subagent ran, or the fix loop exceeds 3 rounds: stop and report which agent stalled.

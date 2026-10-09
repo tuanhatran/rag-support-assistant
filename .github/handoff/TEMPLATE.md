@@ -2,6 +2,11 @@
 
 Status: READY_FOR_CODE
 
+## Status Flow
+
+`READY_FOR_CODE` to `READY_FOR_TEST` to `READY_FOR_REVIEW` to `DONE`.
+Use `CHANGES_REQUESTED` for review findings, `BLOCKED` for unresolved decisions, and `USER_REQUEST_CHANGE` when the user changes requirements during final review; route that status to planner.
+
 ## Model Routing
 
 | Complexity | Coder | Tester | Reviewer |
