@@ -84,41 +84,116 @@ describe('Admin screen', () => {
   describe('Users', () => {
     beforeEach(() => openTab('Users'))
 
-    it('cancels a staged plan change without saving it', () => {
+    it('enters edit mode with no changes and hides Confirm when staged values return to saved values', () => {
       cy.intercept('PATCH', '/api/admin/users/*').as('updateUser')
-      cy.contains('tr', user.username).find('select').eq(1).select('premium')
-      cy.contains('button', 'Confirm plan change').should('be.visible')
-      cy.request('/api/admin/users').its('body').then((users: { username: string; plan: string }[]) => {
-        expect(users.find(item => item.username === user.username)?.plan).to.equal('standard')
-      })
-      cy.contains('tr', user.username).contains('button', 'Cancel').click()
-      cy.contains('tr', user.username).find('select').eq(1).should('have.value', 'standard')
-      cy.contains('tr', user.username).contains('button', 'Confirm plan change').should('not.exist')
+      cy.contains('tr', user.username).as('userRow')
+      cy.get('@userRow').find('button[aria-label^="Edit "]').click()
+      cy.get('@userRow').find('select').should('have.length', 2)
+      cy.get('@userRow').find('td').first().should('contain', user.username).find('input, select').should('not.exist')
+      cy.get('@userRow').contains('button', 'Cancel').should('be.visible')
+      cy.get('@userRow').contains('button', 'Confirm').should('not.exist')
+      cy.get('@userRow').find('select').eq(0).select('admin')
+      cy.get('@userRow').find('select').eq(1).select('premium')
+      cy.get('@userRow').contains('button', 'Confirm').should('be.enabled')
+      cy.get('@userRow').find('select').eq(0).select('user')
+      cy.get('@userRow').find('select').eq(1).select('standard')
+      cy.get('@userRow').contains('button', 'Confirm').should('not.exist')
+      cy.get('@userRow').contains('button', 'Cancel').should('be.visible')
+      cy.get('@userRow').find('td').first().should('contain', user.username)
       cy.get('@updateUser.all').should('have.length', 0)
     })
 
-    it('saves a staged plan change only after confirmation', () => {
+    it('cancels staged role and plan changes without saving them', () => {
       cy.intercept('PATCH', '/api/admin/users/*').as('updateUser')
-      cy.contains('tr', user.username).find('select').eq(1).select('premium')
-      cy.contains('tr', user.username).find('.table-actions').within(() => {
-        cy.get('select').should('have.value', 'premium')
-        cy.contains('button', 'Confirm plan change').click()
+      cy.contains('tr', user.username).as('userRow')
+      cy.get('@userRow').find('button[aria-label^="Edit "]').click()
+      cy.get('@userRow').find('select').eq(0).select('admin')
+      cy.get('@userRow').find('select').eq(1).select('premium')
+      cy.request('/api/admin/users').its('body').then((users: { username: string; plan: string }[]) => {
+        expect(users.find(item => item.username === user.username)?.plan).to.equal('standard')
       })
-      cy.wait('@updateUser').its('response.statusCode').should('eq', 200)
-      cy.get('.page-alert').should('contain', `Updated ${user.username}.`)
-      cy.contains('tr', user.username).find('select').eq(1).should('have.value', 'premium')
-      cy.contains('tr', user.username).contains('button', 'Confirm plan change').should('not.exist')
+      cy.get('@userRow').contains('button', 'Cancel').click()
+      cy.get('@userRow').find('select').should('not.exist')
+      cy.get('@userRow').should('contain', 'user').and('contain', 'standard')
+      cy.get('@updateUser.all').should('have.length', 0)
     })
 
-    it('refuses to demote the last admin', () => {
+    it('confirms and persists staged role and plan changes together', () => {
+      cy.intercept('PATCH', '/api/admin/users/*').as('updateUser')
+      cy.contains('tr', user.username).as('userRow')
+      cy.get('@userRow').find('button[aria-label^="Edit "]').click()
+      cy.get('@userRow').find('select').eq(0).select('admin')
+      cy.get('@userRow').find('select').eq(1).select('premium')
+      cy.get('@userRow').contains('button', 'Confirm').click()
+      cy.wait('@updateUser').then(({ request, response }) => {
+        expect(response?.statusCode).to.equal(200)
+        expect(request.body).to.deep.equal({ role: 'admin', plan: 'premium' })
+      })
+      cy.get('.page-alert').should('contain', `Updated ${user.username}.`)
+      cy.get('@userRow').find('select').should('not.exist')
+      cy.get('@userRow').should('contain', 'admin').and('contain', 'premium')
+    })
+
+    it('locks row edits until a delayed user update finishes', () => {
+      cy.intercept('PATCH', '/api/admin/users/*', request => {
+        request.continue(response => response.setDelay(1200))
+      }).as('updateUser')
+      cy.contains('tr', user.username).as('userRow')
+      cy.get('@userRow').find('button[aria-label^="Edit "]').click()
+      cy.get('@userRow').find('select').eq(0).select('admin')
+      cy.get('@userRow').find('select').eq(1).select('premium')
+      cy.get('@userRow').contains('button', 'Confirm').click()
+
+      cy.get('@userRow').contains('button', 'Saving...').should('be.disabled').click({ force: true })
+      cy.get('@userRow').contains('button', 'Cancel').should('be.disabled').click({ force: true })
+      cy.get('@userRow').find('select').eq(1).should('be.disabled').select('basic', { force: true })
+      cy.get('@userRow').find('select').eq(0).should('have.value', 'admin')
+      cy.get('@userRow').find('select').eq(1).should('have.value', 'premium')
+      cy.get('@updateUser.all').should('have.length', 1)
+
+      cy.wait('@updateUser').then(({ request, response }) => {
+        expect(response?.statusCode).to.equal(200)
+        expect(request.body).to.deep.equal({ role: 'admin', plan: 'premium' })
+      })
+      cy.get('@userRow').find('select').should('not.exist')
+      cy.get('@userRow').should('contain', 'admin').and('contain', 'premium')
+      cy.request('/api/admin/users').then(({ body }) => {
+        const savedUser = (body as { username: string; role: string; plan: string }[]).find(item => item.username === user.username)
+        expect(savedUser).to.include({ role: 'admin', plan: 'premium' })
+      })
+      cy.get('@updateUser.all').should('have.length', 1)
+    })
+
+    it('keeps a rejected last-admin edit staged until cancelled', () => {
       cy.request('/api/admin/users').then(({ body }) => {
         const admins = body.filter((item: { role: string }) => item.role === 'admin')
         if (admins.length !== 1) {
           Cypress.log({ name: 'skip', message: 'More than one admin exists; demotion check skipped.' })
           return
         }
-        cy.contains('tr', admins[0].username).find('select').first().select('user')
+        const admin = admins[0] as { username: string; plan: string }
+        const stagedPlan = admin.plan === 'basic' ? 'premium' : 'basic'
+        cy.intercept('PATCH', '/api/admin/users/*').as('updateUser')
+        cy.contains('tr', admin.username).as('adminRow')
+        cy.get('@adminRow').find('button[aria-label^="Edit "]').click()
+        cy.get('@adminRow').find('select').first().select('user')
+        cy.get('@adminRow').find('select').eq(1).select(stagedPlan)
+        cy.get('@adminRow').contains('button', 'Confirm').click()
+        cy.wait('@updateUser').then(({ request, response }) => {
+          expect(request.body).to.deep.equal({ role: 'user', plan: stagedPlan })
+          expect(response?.statusCode).not.to.equal(200)
+        })
         cy.get('.form-error.page-alert').should('contain', 'The last admin cannot be demoted')
+        cy.get('@adminRow').find('select').first().should('have.value', 'user')
+        cy.get('@adminRow').find('select').eq(1).should('have.value', stagedPlan)
+        cy.get('@adminRow').contains('button', 'Confirm').should('be.visible')
+        cy.get('@adminRow').contains('button', 'Cancel').click()
+        cy.get('@adminRow').find('select').should('not.exist')
+        cy.get('@adminRow').should('contain', 'admin').and('contain', admin.plan)
+        cy.request('/api/admin/users').then(({ body: refreshedUsers }) => {
+          expect(refreshedUsers.find((item: { username: string }) => item.username === admin.username))
+            .to.include({ role: 'admin', plan: admin.plan })
+        })
       })
     })
   })

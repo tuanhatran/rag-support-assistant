@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { Activity, Check, ChevronDown, CircleAlert, ClipboardList, Pencil, Plus, RefreshCw, ServerCog, ShieldCheck, Trash2, UploadCloud, Users } from 'lucide-react'
 import { api } from '../api'
 import type { Connection, Plan } from '../types'
@@ -7,6 +7,7 @@ import { IngestionPipelineView } from './IngestionPipelineView'
 
 type AdminTab = 'connections' | 'ingestion' | 'users' | 'feedback' | 'audit'
 type AdminUser = { id: string; username: string; role: 'user' | 'admin'; plan: Plan; created_at?: string }
+type UserEdit = Pick<AdminUser, 'role' | 'plan'>
 type Feedback = { session_id: string; message_id: string; username: string; rating: 'up' | 'down'; categories: string[]; comment: string; question: string; answer: string; model: { model: string }; created_at: string }
 type AuditEntry = { timestamp: string; event: string; outcome: string; actor?: { username: string }; target?: Record<string, string>; details?: Record<string, string>; request_id?: string }
 type ConnectionForm = Omit<Connection, 'id' | 'api_key_hint' | 'has_api_key'> & { api_key: string; remove_api_key: boolean }
@@ -18,7 +19,9 @@ export function AdminView() {
   const [tab, setTab] = useState<AdminTab>('connections')
   const [connections, setConnections] = useState<Connection[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
-  const [pendingPlans, setPendingPlans] = useState<Record<string, Plan>>({})
+  const [userEdits, setUserEdits] = useState<Record<string, UserEdit>>({})
+  const [savingUsers, setSavingUsers] = useState<Set<string>>(() => new Set())
+  const savingUserIds = useRef(new Set<string>())
   const [feedback, setFeedback] = useState<Feedback[]>([])
   const [stats, setStats] = useState({ total: 0, helpful: 0, not_helpful: 0, satisfaction_percent: 0 })
   const [audit, setAudit] = useState<AuditEntry[]>([])
@@ -84,10 +87,39 @@ export function AdminView() {
     catch (reason) { fail(reason); return false }
   }
 
-  async function confirmPlanChange(user: AdminUser) {
-    const plan = pendingPlans[user.id]
-    if (plan && await updateUser(user, { plan })) {
-      setPendingPlans(current => { const next = { ...current }; delete next[user.id]; return next })
+  function startUserEdit(user: AdminUser) {
+    if (savingUserIds.current.has(user.id)) return
+    setUserEdits(current => ({ ...current, [user.id]: { role: user.role, plan: user.plan } }))
+    setError('')
+    setNotice('')
+  }
+
+  function cancelUserEdit(user: AdminUser) {
+    if (savingUserIds.current.has(user.id)) return
+    setUserEdits(current => { const next = { ...current }; delete next[user.id]; return next })
+  }
+
+  function stageUserEdit(user: AdminUser, field: keyof UserEdit, value: UserEdit[keyof UserEdit]) {
+    if (savingUserIds.current.has(user.id)) return
+    setUserEdits(current => ({ ...current, [user.id]: { ...current[user.id], [field]: value } }))
+  }
+
+  async function confirmUserEdit(user: AdminUser) {
+    if (savingUserIds.current.has(user.id)) return
+    const staged = userEdits[user.id]
+    if (!staged || (staged.role === user.role && staged.plan === user.plan)) return
+    const changes: Partial<UserEdit> = {}
+    if (staged.role !== user.role) changes.role = staged.role
+    if (staged.plan !== user.plan) changes.plan = staged.plan
+    savingUserIds.current.add(user.id)
+    setSavingUsers(current => new Set(current).add(user.id))
+    try {
+      if (await updateUser(user, changes)) {
+        setUserEdits(current => { const next = { ...current }; delete next[user.id]; return next })
+      }
+    } finally {
+      savingUserIds.current.delete(user.id)
+      setSavingUsers(current => { const next = new Set(current); next.delete(user.id); return next })
     }
   }
 
@@ -125,7 +157,20 @@ export function AdminView() {
       )
     )}
 
-    {tab === 'users' && <section className="admin-section"><div className="section-toolbar"><div><span className="eyebrow">IDENTITY &amp; ACCESS</span><h2>User accounts</h2><p>Change a user's support plan or role. The last admin cannot be demoted.</p></div><span className="count-pill">{users.length} accounts</span></div><div className="table-wrap"><table><thead><tr><th>Username</th><th>Role</th><th>Plan</th><th>Created</th><th>Model assignment</th></tr></thead><tbody>{users.map(user => { const assigned = connections.find(connection => connection.plans.includes(user.plan)); const pendingPlan = pendingPlans[user.id]; return <tr key={user.id}><td><b className="table-primary">{user.username}</b>{user.role === 'admin' && <span className="admin-user-label">ADMIN</span>}</td><td><label className="sr-only" htmlFor={`role-${user.id}`}>Role for {user.username}</label><select id={`role-${user.id}`} className="table-select" value={user.role} onChange={event => updateUser(user, { role: event.target.value as AdminUser['role'] })}><option value="user">User</option><option value="admin">Admin</option></select></td><td><label className="sr-only" htmlFor={`plan-${user.id}`}>Plan for {user.username}</label><div className="table-actions"><select id={`plan-${user.id}`} className="table-select" value={pendingPlan ?? user.plan} onChange={event => { const plan = event.target.value as Plan; setPendingPlans(current => { const next = { ...current }; if (plan === user.plan) delete next[user.id]; else next[user.id] = plan; return next }) }}>{planLabels.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</select>{pendingPlan !== undefined && <><button type="button" className="button button-primary" onClick={() => confirmPlanChange(user)}>Confirm plan change</button><button type="button" className="button" onClick={() => setPendingPlans(current => { const next = { ...current }; delete next[user.id]; return next })}>Cancel</button></>}</div></td><td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}</td><td>{assigned ? <span>{assigned.model}</span> : <span className="missing-model">No model assigned</span>}</td></tr> })}</tbody></table></div></section>}
+    {tab === 'users' && <section className="admin-section"><div className="section-toolbar"><div><span className="eyebrow">IDENTITY &amp; ACCESS</span><h2>User accounts</h2><p>Change a user's support plan or role. The last admin cannot be demoted.</p></div><span className="count-pill">{users.length} accounts</span></div><div className="table-wrap"><table><thead><tr><th>Username</th><th>Role</th><th>Plan</th><th>Created</th><th>Model assignment</th><th>Action</th></tr></thead><tbody>{users.map(user => {
+      const assigned = connections.find(connection => connection.plans.includes(user.plan))
+      const staged = userEdits[user.id]
+      const isSaving = savingUsers.has(user.id)
+      const hasChanges = staged !== undefined && (staged.role !== user.role || staged.plan !== user.plan)
+      return <tr key={user.id}>
+        <td><b className="table-primary">{user.username}</b>{user.role === 'admin' && <span className="admin-user-label">ADMIN</span>}</td>
+        <td>{staged ? <><label className="sr-only" htmlFor={`role-${user.id}`}>Role for {user.username}</label><select id={`role-${user.id}`} className="table-select" value={staged.role} disabled={isSaving} onChange={event => stageUserEdit(user, 'role', event.target.value as AdminUser['role'])}><option value="user">User</option><option value="admin">Admin</option></select></> : <span className="user-role">{user.role}</span>}</td>
+        <td>{staged ? <><label className="sr-only" htmlFor={`plan-${user.id}`}>Plan for {user.username}</label><select id={`plan-${user.id}`} className="table-select" value={staged.plan} disabled={isSaving} onChange={event => stageUserEdit(user, 'plan', event.target.value as Plan)}>{planLabels.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</select></> : <span className={`plan-badge ${user.plan}`}>{user.plan}</span>}</td>
+        <td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}</td>
+        <td>{assigned ? <span>{assigned.model}</span> : <span className="missing-model">No model assigned</span>}</td>
+        <td><div className="user-row-actions">{staged ? <>{hasChanges && <button type="button" className="button button-primary" disabled={isSaving} onClick={() => confirmUserEdit(user)}>{isSaving ? 'Saving...' : 'Confirm'}</button>}<button type="button" className="button" disabled={isSaving} onClick={() => cancelUserEdit(user)}>Cancel</button></> : <button type="button" className="icon-button" title={`Edit ${user.username}`} aria-label={`Edit ${user.username}`} onClick={() => startUserEdit(user)}><Pencil size={15} /></button>}</div></td>
+      </tr>
+    })}</tbody></table></div></section>}
 
     {tab === 'feedback' && <section className="admin-section"><div className="section-toolbar"><div><span className="eyebrow">ANSWER QUALITY</span><h2>Chat feedback</h2><p>Review ratings and user comments on generated answers.</p></div><label className="select-wrap compact-select"><span>Rating</span><select value={rating} onChange={event => setRating(event.target.value)}><option value="">All ratings</option><option value="up">Helpful</option><option value="down">Not helpful</option></select><ChevronDown size={14} /></label></div><div className="stats-strip">{[['TOTAL RATINGS', stats.total], ['HELPFUL', stats.helpful], ['NOT HELPFUL', stats.not_helpful], ['SATISFACTION', `${stats.satisfaction_percent}%`]].map(([label, value]) => <div className="stat-cell" key={label}><span>{label}</span><b>{value}</b></div>)}</div><div className="feedback-cards">{feedback.map(item => <article className="feedback-card" key={`${item.session_id}-${item.message_id}`}><div className="feedback-card-head"><span className={`rating-pill ${item.rating}`}>{item.rating === 'up' ? 'Helpful' : 'Not helpful'}</span><span>{item.username}</span><span>{new Date(item.created_at).toLocaleString()}</span><span className="feedback-model">{item.model?.model}</span></div><div className="feedback-exchange"><b>Question</b><p>{item.question}</p><b>Answer</b><p>{item.answer}</p></div>{item.categories.length > 0 && <div className="feedback-category-row">{item.categories.map(value => <span className="feedback-category" key={value}>{value.replace('_', ' ')}</span>)}</div>}{item.comment && <blockquote>{item.comment}</blockquote>}</article>)}{feedback.length === 0 && <div className="table-empty">No feedback matches this filter.</div>}</div></section>}
 
