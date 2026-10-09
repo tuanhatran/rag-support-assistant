@@ -1,17 +1,17 @@
 # Self-Evaluation
 
-Date: 2026-10-08
+Date: 2026-10-09
 
 ## Summary
 
-The application builds successfully in both layers and the backend test suite passes. This verifies the automated checks listed below, but does not establish production answer quality: no live LLM, production-like corpus, or end-to-end browser session was evaluated here.
+The latest recorded project gates pass: the backend suite reports 64 passed and 1 skipped, and the frontend production build succeeds. These results are from the completed RSA-2 handoff and were not rerun for this report. They do not establish production answer quality: no live LLM, production-like corpus, or end-to-end browser session was evaluated here.
 
 ## Verification Results
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Backend automated tests | Pass | `cd backend && python -m pytest -q -p no:warnings` — 38 passed in 1.76s |
-| Frontend production build | Pass | `cd frontend && npm run build` — TypeScript build and Vite production build completed successfully |
+| Backend automated tests | Pass | Latest recorded in RSA-2 handoff: `cd backend && python -m pytest -q -p no:warnings` — 64 passed, 1 skipped in 3.62s |
+| Frontend production build | Pass | Latest recorded in RSA-2 handoff: `cd frontend && npm run build` — TypeScript and Vite production build succeeded in 2.25s |
 | Live provider evaluation | Not run | No external provider request was made |
 | Browser end-to-end evaluation | Not run | This evaluation did not start the full application stack or execute Cypress |
 | Retrieval quality benchmark | Not run | No labeled question-to-source evaluation set or retrieval metrics were collected |
@@ -19,10 +19,11 @@ The application builds successfully in both layers and the backend test suite pa
 ## Qualitative Assessment
 
 - **Runnable baseline:** the mock provider and local BM25 corpus support development without external model credentials.
+- **Document ingestion:** admins can upload `.txt` and `.pdf` files through a staged pipeline; chunks and embeddings are stored in PostgreSQL with pgvector, and pipeline history is available in the admin UI. The chat path still uses the bundled BM25 index, so newly ingested documents do not yet inform chat answers.
 - **Traceability:** request IDs are returned to clients and included in structured request logs. Chat event logs record model, status, latency, and source count without logging question or answer text.
 - **Grounding:** retrieved sections are included in the model prompt and the prompt requests numbered citations and abstention when context is insufficient. Citation correctness and claim-level support are not independently validated.
 - **Retrieval limits:** BM25 is a reasonable low-infrastructure choice for the current small corpus, but lexical matching, the fixed tokenizer, and the score cutoff have not been measured against a labeled set. Recall, ranking quality, and multilingual performance remain unknown.
-- **Privacy and retention:** the application includes redaction, consent, user-scoped data, encrypted LLM keys, and expiry/TTL behavior. This run did not constitute a security audit or verify retention against a live MongoDB deployment.
+- **Privacy and retention:** the application includes redaction, consent, user-scoped data, encrypted LLM keys, and expiry/TTL behavior. This evaluation did not constitute a security audit or verify retention against live MongoDB and PostgreSQL deployments.
 
 ## Sanitized Log Examples
 
