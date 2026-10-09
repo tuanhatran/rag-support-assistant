@@ -106,12 +106,7 @@ npm run e2e        # headless
 npm run cy:open    # interactive runner
 ```
 
-The admin spec signs in as the bootstrap admin and is skipped when the credentials are not provided. Pass them as environment variables (the values from your `.env`):
-
-```powershell
-$env:CYPRESS_ADMIN_USERNAME = '<RAG_BOOTSTRAP_ADMIN_USERNAME>'
-$env:CYPRESS_ADMIN_PASSWORD = '<RAG_BOOTSTRAP_ADMIN_PASSWORD>'
-```
+The admin spec signs in as the bootstrap admin and is skipped when the credentials are not provided. Set `CYPRESS_ADMIN_USERNAME` and `CYPRESS_ADMIN_PASSWORD` in the repository-root `.env` (use same values as `RAG_BOOTSTRAP_ADMIN_USERNAME` and `RAG_BOOTSTRAP_ADMIN_PASSWORD`); Cypress loads them automatically. You can also provide either variable in the process environment to override its `.env` value.
 
 Set `CYPRESS_BASE_URL` to test another origin, for example `http://localhost:5173` with `npm run dev`. Each spec creates its own `e2e_*` users and removes them afterwards.
 

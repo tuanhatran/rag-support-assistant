@@ -93,7 +93,7 @@ Updated: 2026-10-08
 
 | File | Responsibility |
 | --- | --- |
-| `frontend/cypress.config.ts` | Loads root `.env` for Cypress credentials, base URL `http://localhost:8080`, spec and support paths |
+| `frontend/cypress.config.ts` | Root `.env` admin credentials, base URL `http://localhost:8080`, Windows localhost IPv6 routing, spec and support paths |
 | `frontend/cypress/tsconfig.json` | Cypress-only TypeScript project, outside the app `tsc -b` |
 | `frontend/cypress/support/e2e.ts` | Support entry, loads commands |
 | `frontend/cypress/support/helpers.ts` | Unique credentials, admin env credentials, admin skip guard |
