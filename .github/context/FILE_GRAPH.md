@@ -155,10 +155,11 @@ Updated: 2026-10-10
 
 ## Operations
 
-| File                  | Responsibility                                    |
-| --------------------- | ------------------------------------------------- |
-| `docker-compose.yml`  | MongoDB, backend, frontend services               |
-| `backend/Dockerfile`  | Python 3.13 API image                             |
-| `frontend/Dockerfile` | Vite build and nginx image                        |
-| `frontend/nginx.conf` | Same-origin `/api` reverse proxy and SPA fallback |
-| `.env.example`        | Local and Docker configuration template           |
+| File                      | Responsibility                                                                                      |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| `.github/workflows/ci.yml` | Separate Vitest coverage job; backend tests and frontend formatting/build checks                   |
+| `docker-compose.yml`      | MongoDB, backend, frontend services                                                                 |
+| `backend/Dockerfile`      | Python 3.13 API image                                                                               |
+| `frontend/Dockerfile`     | Vite build and nginx image                                                                          |
+| `frontend/nginx.conf`     | Same-origin `/api` reverse proxy and SPA fallback                                                   |
+| `.env.example`            | Local and Docker configuration template                                                            |
