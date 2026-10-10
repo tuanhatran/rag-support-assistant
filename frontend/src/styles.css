@@ -1,25 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
-
-:root {
-  font-family: 'DM Sans', 'Segoe UI', sans-serif;
-  color: #192521;
-  background: #f1f3ef;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  --ink: #192521;
-  --muted: #718078;
-  --faint: #9ba69f;
-  --line: #dfe5df;
-  --surface: #fff;
-  --canvas: #f1f3ef;
-  --green: #176c54;
-  --green-dark: #124b3e;
-  --green-soft: #e5f2eb;
-  --lime: #d9ec83;
-  --coral: #c45b42;
-  --coral-soft: #fff0e9;
-  --mono: 'DM Mono', Consolas, monospace;
-}
+@import './styles/tokens.css';
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--canvas); }

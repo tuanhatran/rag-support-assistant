@@ -1,22 +1,16 @@
-import { ChangeEvent, DragEvent, FormEvent, useEffect, useState } from 'react'
-import { ArrowRight, CheckCircle2, ChevronDown, Cpu, FileText, Layers, RefreshCw, Sparkles, Upload, UploadCloud } from 'lucide-react'
-import { api } from '../api'
-import type { EmbeddingModelOption, IngestionOptions, PipelineSummary } from '../types'
+import { useEffect, useState } from 'react'
+import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import * as ingestionApi from '../api/ingestion'
+import type { IngestionOptions, PipelineSummary } from '../types/ingestion'
+import { IngestionForm, type IngestionSettings } from './ingestion/IngestionForm'
+import { PipelineHistory } from './ingestion/PipelineHistory'
 
 interface IngestionViewProps {
   onOpenPipeline: (pipelineId: string) => void
 }
 
-const MAX_FILE_SIZE = 512_000 // 500 KB
-
 export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
   const [options, setOptions] = useState<IngestionOptions | null>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const [chunkSize, setChunkSize] = useState(500)
-  const [chunkOverlap, setChunkOverlap] = useState(50)
-  const [separator, setSeparator] = useState('\n\n')
-  const [embeddingModel, setEmbeddingModel] = useState('@cf/baai/bge-small-en-v1.5')
-  const [isDragging, setIsDragging] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submittedPipelineId, setSubmittedPipelineId] = useState<string | null>(null)
@@ -28,7 +22,7 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
     setLoadingHistory(true)
     setHistoryError('')
     try {
-      const data = await api.get<PipelineSummary[]>('/admin/ingestion/pipelines')
+      const data = await ingestionApi.listPipelines()
       setHistory(data)
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : 'Failed to load ingestion history')
@@ -38,63 +32,14 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
   }
 
   useEffect(() => {
-    api.get<IngestionOptions>('/admin/ingestion/options')
-      .then(res => {
-        setOptions(res)
-        if (res.chunk_size?.default) setChunkSize(res.chunk_size.default)
-        if (res.chunk_overlap?.default) setChunkOverlap(res.chunk_overlap.default)
-        if (res.models?.length > 0 && !res.models.some(m => m.id === embeddingModel)) {
-          setEmbeddingModel(res.models[0].id)
-        }
-      })
+    ingestionApi.getIngestionOptions()
+      .then(setOptions)
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load options'))
 
     loadHistory()
   }, [])
 
-  function validateAndSelectFile(selected: File | null) {
-    setError('')
-    setSubmittedPipelineId(null)
-    if (!selected) {
-      setFile(null)
-      return
-    }
-    const name = selected.name.toLowerCase()
-    if (!name.endsWith('.txt') && !name.endsWith('.pdf')) {
-      setError('Unsupported file type. Only .txt and .pdf files are accepted.')
-      setFile(null)
-      return
-    }
-    if (selected.size === 0) {
-      setError('Uploaded file cannot be empty.')
-      setFile(null)
-      return
-    }
-    if (selected.size > MAX_FILE_SIZE) {
-      setError('File exceeds maximum allowed size of 500 KB (512,000 bytes).')
-      setFile(null)
-      return
-    }
-    setFile(selected)
-  }
-
-  function handleDrop(e: DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    setIsDragging(false)
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      validateAndSelectFile(e.dataTransfer.files[0])
-    }
-  }
-
-  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
-    if (e.target.files && e.target.files.length > 0) {
-      validateAndSelectFile(e.target.files[0])
-    }
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!file) return
+  async function handleSubmit(file: File, settings: IngestionSettings) {
     setError('')
     setSubmitting(true)
     setSubmittedPipelineId(null)
@@ -102,15 +47,12 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('chunk_size', String(chunkSize))
-      formData.append('chunk_overlap', String(chunkOverlap))
-      formData.append('separator', separator)
-      formData.append('embedding_model', embeddingModel)
+      formData.append('chunk_size', String(settings.chunkSize))
+      formData.append('chunk_overlap', String(settings.chunkOverlap))
+      formData.append('separator', settings.separator)
+      formData.append('embedding_model', settings.embeddingModel)
 
-      const result = await api.postForm<{ id: string; status: string }>(
-        '/admin/ingestion/pipelines',
-        formData
-      )
+      const result = await ingestionApi.createPipeline(formData)
       setSubmittedPipelineId(result.id)
       loadHistory()
     } catch (err) {
@@ -119,8 +61,6 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
       setSubmitting(false)
     }
   }
-
-  const selectedModel: EmbeddingModelOption | undefined = options?.models?.find(m => m.id === embeddingModel)
 
   return (
     <section className="admin-section ingestion-view">
@@ -131,13 +71,6 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
           <p>Upload documentation to parse, redact sensitive data, chunk, embed, and store vectors in PostgreSQL pgvector.</p>
         </div>
       </div>
-
-      {error && (
-        <div className="form-error page-alert">
-          {error}
-          <button className="icon-button" aria-label="Dismiss error" onClick={() => setError('')}>X</button>
-        </div>
-      )}
 
       {submittedPipelineId && (
         <div className="inline-success page-alert pipeline-success-banner">
@@ -164,199 +97,9 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="ingestion-form">
-        <div className="ingestion-grid">
-          {/* Upload Zone */}
-          <div className="ingestion-col">
-            <label className="field-label">Document File</label>
-            <div
-              className={`upload-dropzone ${isDragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
-              onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-            >
-              <input
-                type="file"
-                id="document-upload"
-                accept=".txt,.pdf"
-                className="sr-only"
-                onChange={handleFileChange}
-              />
-              <UploadCloud size={36} className="upload-icon" />
-              {file ? (
-                <div className="file-preview-card">
-                  <FileText size={20} />
-                  <div className="file-meta">
-                    <span className="file-name">{file.name}</span>
-                    <span className="file-size">{(file.size / 1024).toFixed(1)} KB</span>
-                  </div>
-                  <label htmlFor="document-upload" className="button button-subtle">
-                    Change
-                  </label>
-                </div>
-              ) : (
-                <div className="upload-prompt">
-                  <p>Drag and drop your document here, or</p>
-                  <label htmlFor="document-upload" className="button button-secondary">
-                    <Upload size={14} /> Browse file
-                  </label>
-                  <small className="upload-hint">Accepted formats: .txt, .pdf (Max size 500 KB / 512,000 bytes)</small>
-                </div>
-              )}
-            </div>
-          </div>
+      <IngestionForm options={options} submitting={submitting} error={error} onError={setError} onSelectionChange={() => setSubmittedPipelineId(null)} onSubmit={handleSubmit} />
 
-          {/* Configuration Options */}
-          <div className="ingestion-col">
-            <div className="options-card">
-              <div className="options-header">
-                <Layers size={16} />
-                <b>Chunking &amp; Model Options</b>
-              </div>
-
-              <div className="option-row">
-                <div className="field-label">
-                  Chunk Size
-                  <small className="field-hint">(100 - 2000 chars)</small>
-                </div>
-                <input
-                  type="number"
-                  min={options?.chunk_size?.min ?? 100}
-                  max={options?.chunk_size?.max ?? 2000}
-                  value={chunkSize}
-                  onChange={e => setChunkSize(Number(e.target.value))}
-                  required
-                />
-              </div>
-
-              <div className="option-row">
-                <div className="field-label">
-                  Chunk Overlap
-                  <small className="field-hint">(&ge; 0 and &lt; chunk size)</small>
-                </div>
-                <input
-                  type="number"
-                  min={0}
-                  max={Math.max(0, chunkSize - 1)}
-                  value={chunkOverlap}
-                  onChange={e => setChunkOverlap(Number(e.target.value))}
-                  required
-                />
-              </div>
-
-              <div className="option-row">
-                <div className="field-label">Separator</div>
-                <div className="select-wrap">
-                  <select value={separator} onChange={e => setSeparator(e.target.value)}>
-                    {(options?.separators || [
-                      { value: '\n\n', label: 'Paragraphs (\\n\\n)' },
-                      { value: '\n', label: 'Lines (\\n)' },
-                      { value: ' ', label: 'Spaces ( )' },
-                    ]).map(sep => (
-                      <option key={sep.value} value={sep.value}>{sep.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} />
-                </div>
-              </div>
-
-              <div className="option-row">
-                <div className="field-label">Embedding Model</div>
-                <div className="select-wrap">
-                  <select value={embeddingModel} onChange={e => setEmbeddingModel(e.target.value)}>
-                    {options?.models?.map(m => (
-                      <option key={m.id} value={m.id}>{m.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} />
-                </div>
-              </div>
-
-              {selectedModel && (
-                <div className="model-info-badge">
-                  <div className="model-info-item">
-                    <Cpu size={14} />
-                    <span><b>Target:</b> {selectedModel.target}</span>
-                  </div>
-                  <div className="model-info-item">
-                    <Sparkles size={14} />
-                    <span><b>Dimensions:</b> {selectedModel.dimensions}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="ingestion-actions">
-          <button
-            type="submit"
-            className="button button-primary submit-ingestion-btn"
-            disabled={!file || submitting}
-          >
-            {submitting ? 'Starting pipeline...' : 'Process & Ingest Document'}
-          </button>
-        </div>
-      </form>
-
-      <div className="ingestion-history-section">
-        <div className="section-toolbar">
-          <div>
-            <span className="eyebrow">PIPELINE HISTORY</span>
-            <h3>History</h3>
-            <p>Previous document ingestion pipelines and processing status.</p>
-          </div>
-          <button
-            type="button"
-            className="icon-button"
-            title="Refresh history"
-            aria-label="Refresh ingestion history"
-            onClick={loadHistory}
-          >
-            <RefreshCw size={15} />
-          </button>
-        </div>
-
-        {historyError && (
-          <div className="form-error page-alert">
-            {historyError}
-            <button className="icon-button" aria-label="Dismiss error" onClick={() => setHistoryError('')}>X</button>
-          </div>
-        )}
-
-        {loadingHistory ? (
-          <div className="table-empty">Loading ingestion history...</div>
-        ) : history.length === 0 ? (
-          !historyError && <div className="table-empty">No ingestion pipelines yet.</div>
-        ) : (
-          <div className="history-list">
-            {history.map(item => (
-              <button
-                key={item.id}
-                type="button"
-                className="history-row-btn"
-                onClick={() => onOpenPipeline(item.id)}
-              >
-                <span className="history-row-main">
-                  <FileText size={16} className="history-row-icon" />
-                  <span className="history-row-info">
-                    <span className="history-row-filename">{item.filename}</span>
-                    <span className="history-row-date">
-                      {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
-                    </span>
-                  </span>
-                </span>
-                <span className="history-row-meta">
-                  <span className="history-row-chunks">
-                    {item.chunk_count} {item.chunk_count === 1 ? 'chunk' : 'chunks'}
-                  </span>
-                  <span className={`status-pill ${item.status}`}>{item.status}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <PipelineHistory pipelines={history} loading={loadingHistory} error={historyError} onRefresh={loadHistory} onDismissError={() => setHistoryError('')} onOpen={onOpenPipeline} />
     </section>
   )
 }
