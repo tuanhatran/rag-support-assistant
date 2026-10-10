@@ -1,19 +1,21 @@
 # RAG Support Assistant
 
-A RAG (Retrieval-Augmented Generation) simulation: an AI chat that answers IT troubleshooting questions from a small knowledge base, with sources and answer feedback. Users sign in, and each user's plan decides which LLM answers them.
+A RAG (Retrieval-Augmented Generation) support assistant. Chat answers IT troubleshooting questions from the bundled knowledge base, with sources and answer feedback. Admins can also run a separate document-ingestion pipeline that embeds uploaded files into PostgreSQL/pgvector; those uploaded vectors are not currently used by chat retrieval. Users sign in, and each user's plan decides which LLM answers them.
 
 | Part | Stack |
 | --- | --- |
-| Backend | Python 3.13, FastAPI, PyMongo (async), BM25 retrieval |
+| Backend | Python 3.13, FastAPI, PyMongo (async), BM25 chat retrieval, embedding ingestion |
 | Frontend | React 19, TypeScript, Vite |
-| Database | MongoDB 7 |
+| Databases | MongoDB 7; PostgreSQL 17 with pgvector for ingestion |
 
 ## Features
 
 - **Accounts and RBAC**: users sign up with a username, password, and plan, then sign in. There are two roles, `user` and `admin`. Admin pages and endpoints require the `admin` role. Each user sees only their own conversations.
 - **Plan-based model assignment**: the plan chosen at sign-up (`basic`, `standard`, or `premium`) decides which LLM connection answers that user. Each plan is served by exactly one connection, and admins can reassign plans or change a user's plan at any time.
-- **Knowledge base**: 10 troubleshooting documents in `backend/app/data/documents` (VPN, lockout, Outlook, printers, Wi-Fi, Kubernetes, databases, API gateway, disk space...). They are chunked by `##` section and indexed with BM25 at startup.
+- **Chat knowledge base**: 10 troubleshooting Markdown documents in `backend/app/data/documents` (VPN, lockout, Outlook, printers, Wi-Fi, Kubernetes, databases, API gateway, disk space, and laptop performance). They are split by `##` section and indexed with BM25 at startup. Chat searches this bundled index.
 - **AI chat**: each question retrieves the top sections, builds a grounded prompt (with the last 3 exchanges as history), and calls the model assigned to the user's plan. Answers show clickable sources.
+- **Admin document ingestion**: admins can upload `.txt` or `.pdf` files up to 500 KB. The background pipeline extracts and redacts text, chunks it with configurable size, overlap, and separator, creates embeddings, and stores chunks in PostgreSQL/pgvector. Pipeline history shows stage status, extracted text, and chunk previews, and can copy an export payload as JSON. Ingestion is separate from the bundled chat knowledge base; uploaded chunks do not currently affect chat answers.
+- **Embedding models**: Cloudflare Workers AI (`@cf/baai/bge-small-en-v1.5`), local FastEmbed (`sentence-transformers/all-MiniLM-L6-v2` or `BAAI/bge-base-en-v1.5`), and OpenAI (`text-embedding-3-small`). Cloudflare and OpenAI require their corresponding API configuration; FastEmbed runs locally.
 - **LLM connections (admin)**: add, edit, test, and delete connections, and choose which plans each one serves:
   - `mock`: built-in simulator. It needs no network or key and serves all plans by default.
   - `openai`: OpenAI or any OpenAI-compatible API (ollama `http://localhost:11434/v1`, Mistral, vLLM, LM Studio...).
@@ -33,29 +35,31 @@ A RAG (Retrieval-Augmented Generation) simulation: an AI chat that answers IT tr
 | `chat_feedback` | One document per rated answer (unique on `session_id` + `message_id`), with the user and a redacted snapshot of the question, answer, and comment |
 | `llm_connections` | LLM connection settings and the `plans` each one serves. API keys are stored encrypted (`api_key_encrypted`) |
 | `audit_logs` | Security and admin events: event, outcome, actor, target, details, request ID, IP address, user agent |
+| `ingestion_pipelines` | Uploaded file metadata, processing options and stage status, extracted text, errors, and expiry |
 
-Every collection that holds personal data has an `expires_at` field and a TTL index (`expireAfterSeconds: 0`), so MongoDB deletes expired documents automatically. This works the same way on AWS DocumentDB.
+MongoDB collections with expiring data have an `expires_at` field and a TTL index (`expireAfterSeconds: 0`), so MongoDB deletes expired documents automatically. Ingested chunks and embeddings live in PostgreSQL's `document_chunks` table and are removed by the backend's hourly expiry sweep.
 
 ## Run with Docker
 
 ```bash
 cp .env.example .env
-# Set a strong RAG_BOOTSTRAP_ADMIN_PASSWORD and replace RAG_ENCRYPTION_KEY with:
+# Set strong RAG_BOOTSTRAP_ADMIN_PASSWORD and POSTGRES_PASSWORD values, then replace RAG_ENCRYPTION_KEY with:
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 docker compose up --build
 ```
 
-Open http://localhost:8080 (API docs: http://localhost:8080/docs).
+Docker Compose starts MongoDB, PostgreSQL with pgvector, the backend, and frontend. Open http://localhost:8080 (API docs: http://localhost:8080/docs).
 
 ## Run locally (Windows)
 
-Start MongoDB 7 (Docker Desktop is sufficient):
+Start MongoDB 7 (Docker Desktop is sufficient). The chat works with MongoDB alone; admin document ingestion also needs PostgreSQL with pgvector and `RAG_PGVECTOR_DSN` configured. Replace `change-me` in the PostgreSQL command with a password and use the same password in the DSN:
 
 ```powershell
 docker run -d --name rag-mongo -p 27017:27017 mongo:7
+docker run -d --name rag-pgvector -e POSTGRES_DB=rag_support -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=change-me -p 5432:5432 pgvector/pgvector:pg17
 ```
 
-Create `backend/.env` from the root `.env.example`. For local runs, set `RAG_MONGO_URI=mongodb://localhost:27017`; also set a strong bootstrap admin password and a generated Fernet key. Generate one with `py -3.13 -m pip install cryptography` followed by `py -3.13 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+Create `backend/.env` from the root `.env.example`. For local runs, set `RAG_MONGO_URI=mongodb://localhost:27017` and, when using ingestion, set `RAG_PGVECTOR_DSN` to your local PostgreSQL connection string. Also set a strong bootstrap admin password and a generated Fernet key. Generate one with `py -3.13 -m pip install cryptography` followed by `py -3.13 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
 
 ```powershell
 Set-Location backend
@@ -80,11 +84,12 @@ Open http://localhost:5173. Vite proxies `/api` to `http://localhost:8000`.
 
 ```bash
 docker run -d --name rag-mongo -p 27017:27017 mongo:7
+docker run -d --name rag-pgvector -e POSTGRES_DB=rag_support -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=change-me -p 5432:5432 pgvector/pgvector:pg17
 
 cd backend
 python3.13 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-cp ../.env.example .env  # set RAG_MONGO_URI=mongodb://localhost:27017 and secrets
+cp ../.env.example .env  # set RAG_MONGO_URI, RAG_PGVECTOR_DSN=postgresql://postgres:<password>@localhost:5432/rag_support, and secrets
 .venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 .venv/bin/uvicorn app.main:create_app --factory --reload
 
@@ -97,13 +102,12 @@ Run tests with `.venv/bin/python -m pytest -q -p no:warnings` from `backend` and
 
 ### End-to-end tests
 
-Cypress specs in `frontend/cypress/e2e/` cover one screen each (login, header/policy, chat, documents, privacy, admin) plus access control. They run against the full stack, so start it first with `docker compose up --build`.
+Cypress specs in `frontend/cypress/e2e/` cover login, header/policy, chat, documents, privacy, admin, and access control. They run against the full stack, so start it first with `docker compose up --build`.
 
 ```bash
 cd frontend
 npm install
 npm run e2e        # headless
-npm run cy:open    # interactive runner
 ```
 
 The admin spec signs in as the bootstrap admin and is skipped when the credentials are not provided. Set `CYPRESS_ADMIN_USERNAME` and `CYPRESS_ADMIN_PASSWORD` in the repository-root `.env` (use same values as `RAG_BOOTSTRAP_ADMIN_USERNAME` and `RAG_BOOTSTRAP_ADMIN_PASSWORD`); Cypress loads them automatically. You can also provide either variable in the process environment to override its `.env` value.
@@ -112,7 +116,7 @@ Set `CYPRESS_BASE_URL` to test another origin, for example `http://localhost:517
 
 ## Development workflow (agents)
 
-Four custom agents in `.github/agents/` split each task into independent stages. Each task (ticket) has its own handoff file `.github/handoff/tasks/<TASK-ID>.md`, for example `PROJ-123.md`, created by the planner from [.github/handoff/TEMPLATE.md](.github/handoff/TEMPLATE.md). Agents share state only through that file, so each stage can run in a fresh chat session and several tasks can be in flight at once. Every development task uses one new branch shared by all stages: the orchestrator asks for its name and creates it before planning; when agents are run manually, the first agent asks for a name and creates it. The branch is recorded in the handoff and reused on resume. Agents require a clean worktree before creating or switching branches and do not commit or push.
+Five custom agents in `.github/agents/` split each task into planner, coder, tester, and reviewer stages, with an orchestrator to coordinate them. Each task (ticket) has its own handoff file `.github/handoff/tasks/<TASK-ID>.md`, for example `PROJ-123.md`, created by the planner from [.github/handoff/TEMPLATE.md](.github/handoff/TEMPLATE.md). The handoff carries shared state, so stages can run in fresh chat sessions and multiple tasks can be in flight. Each task uses one branch shared by all stages; the branch is recorded in the handoff and reused on resume. Agents preserve existing staged and unstaged changes, attempt branch operations non-destructively, and do not commit or push.
 
 | Agent | Acts when Status is | Can edit | Sets Status to |
 | --- | --- | --- | --- |
@@ -125,7 +129,7 @@ Pick `orchestrator` in the agent dropdown and give the ticket, for example `PROJ
 
 **Models.** The planner and reviewer use Claude Sonnet 5.5; the coder and tester use Gemini 3.8 Flash. Each task file carries the routing table copied from the template.
 
-**Context budget.** [.github/context/FILE_GRAPH.md](.github/context/FILE_GRAPH.md) maps modules, endpoints, collections, features, and tests. The planner uses it to list the *Context files* for each task, and the other agents read only those files instead of scanning the whole source tree. The coder keeps the graph up to date and the reviewer checks it.
+**Code context.** The planner lists task-specific *Context files* in each handoff. Agents use CodeGraph MCP for codebase structure and dependency exploration instead of maintaining a separate file graph.
 
 ## Logs and audit trail
 
@@ -149,6 +153,7 @@ Admins can filter the trail by category, outcome, and username under **Admin →
 - Users must accept the current `RAG_DATA_POLICY_VERSION` at sign-up. When you change the version, every user must accept it again before chatting or giving feedback; the backend enforces this, not only the UI.
 - **Redaction** (`app/redaction.py`, same rules as the TSDL chat feedback): passwords, tokens, Authorization headers, API keys, AWS keys, private keys, and connection strings are replaced by `[REDACTED]` before a question is sent to the model or stored. Answers, feedback comments, and audit details are redacted too.
 - **Retention** defaults: conversations 90 days after the last message, feedback 90 days, audit trail 365 days, login sessions 8 hours. A changed retention setting applies to documents written after the change.
+- **Ingestion retention** defaults to 90 days. Pipeline records expire through MongoDB TTL; stored PostgreSQL chunks are removed by an hourly expiry sweep.
 - **User rights** (Privacy page): export all my data as JSON, delete my conversations and feedback, or delete my account (password required). The audit trail is kept until its retention ends, for incident investigation.
 
 ## Accounts
