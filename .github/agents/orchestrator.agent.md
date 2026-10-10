@@ -24,8 +24,8 @@ Each task has its own handoff file `.github/handoff/tasks/<TASK-ID>.md`, where `
 
 Every new development task uses one new branch shared by planning, coding, testing, and review.
 
-- If the task handoff already has a `Branch` value, reuse that branch and do not ask for another name. Before resuming, check the current branch and `git status --short`. If already on the recorded branch, allow only the new active handoff file staged by planner (`A  .github/handoff/tasks/<TASK-ID>.md`); any other dirty state stops the run. Switch branches only from a fully clean worktree. If the recorded branch is missing, stop and ask the user how to proceed; never create a replacement branch for an in-progress task.
-- If the task is new or its handoff has no `Branch` value, ask the user for a branch name and wait before dispatching any subagent. Accept only names containing letters, digits, `.`, `_`, `/`, or `-`; validate with `git check-ref-format --branch "<branch-name>"`. Require a clean worktree and a name not already in use, then create it with `git switch -c "<branch-name>"`.
+- If the task handoff already has a `Branch` value, reuse that branch and do not ask for another name. Before resuming, check the current branch and `git status --short`. Dirty or staged changes never block work: preserve them, inspect overlap with the task, and never reset, clean, stash, or overwrite them. If on another branch, attempt a normal non-destructive switch to the recorded branch; if Git refuses because of local changes, continue on the current branch and report the deviation. If the recorded branch is missing, stop and ask the user how to proceed; never create a replacement branch for an in-progress task.
+- If the task is new or its handoff has no `Branch` value, ask the user for a branch name and wait before dispatching any subagent. Accept only names containing letters, digits, `.`, `_`, `/`, or `-`; validate with `git check-ref-format --branch "<branch-name>"`. Require a name not already in use, then attempt `git switch -c "<branch-name>"` even when worktree is dirty. If Git refuses because of local changes, continue on the current branch and report the deviation. Never discard or stash changes to force branch creation or switching.
 - Pass the branch name to the planner or resumed-stage subagent. The planner records it in the handoff. For a legacy handoff missing `Branch`, the dispatched subagent must add the supplied branch value before doing its stage work.
 - If a subagent is invoked directly, it follows the same setup protocol in `.github/copilot-instructions.md`.
 
@@ -69,6 +69,7 @@ These match the `model` in each agent's own frontmatter. If the task file's rout
 ## Rules
 
 - Work on exactly one task file per run. If the user asks for several tickets, handle them one after another.
+- Ensure each agent stages newly created task files by explicit path with `git add -- <path>`; never stage unrelated untracked files or use broad add commands.
 - If the task file already exists at a `READY_*` or `CHANGES_REQUESTED` status, resume from that stage instead of re-planning.
 - Do not summarize or rewrite the handoff for subagents; they read the task file themselves and use their own context files.
 - Never print secret values from `.env`, logs, or test output.
