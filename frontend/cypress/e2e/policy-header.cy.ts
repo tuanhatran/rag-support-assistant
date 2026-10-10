@@ -4,7 +4,9 @@ describe('Header and policy modal', () => {
   let credentials: Credentials
 
   beforeEach(() => {
-    cy.registerUser('standard').then(created => { credentials = created })
+    cy.registerUser('standard').then((created) => {
+      credentials = created
+    })
   })
 
   afterEach(() => cy.deleteUser(credentials))
@@ -12,8 +14,8 @@ describe('Header and policy modal', () => {
   it('shows brand, navigation, model badge and user chip', () => {
     cy.visit('/')
     cy.get('.brand').should('contain', 'fieldnote')
-    cy.get('nav[aria-label="Main navigation"] button').then($buttons => {
-      expect($buttons.toArray().map(button => button.textContent)).to.deep.equal(['AI Chat', 'Documents', 'Privacy'])
+    cy.get('nav[aria-label="Main navigation"] button').then(($buttons) => {
+      expect($buttons.toArray().map((button) => button.textContent)).to.deep.equal(['AI Chat', 'Documents', 'Privacy'])
     })
     cy.get('.model-badge').should('not.be.empty').and('not.contain', 'Model not assigned')
     cy.get('.user-chip').should('contain', credentials.username).and('contain', 'standard | user')
@@ -38,8 +40,10 @@ describe('Header and policy modal', () => {
   })
 
   it('blocks the app until the policy is accepted', () => {
-    cy.intercept('GET', '/api/auth/me', request => {
-      request.continue(response => { response.body.policy_accepted = false })
+    cy.intercept('GET', '/api/auth/me', (request) => {
+      request.continue((response) => {
+        response.body.policy_accepted = false
+      })
     })
     cy.intercept('POST', '/api/privacy/consent').as('consent')
     cy.visit('/')

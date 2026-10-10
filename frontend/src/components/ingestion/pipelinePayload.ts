@@ -1,6 +1,10 @@
 import type { ChunkPreview, IngestionPipeline } from '../../types'
 
-export function createPipelineExportPayload(pipeline: IngestionPipeline | null, chunks: ChunkPreview[], includeCreatedAt = false) {
+export function createPipelineExportPayload(
+  pipeline: IngestionPipeline | null,
+  chunks: ChunkPreview[],
+  includeCreatedAt = false,
+) {
   const payload = {
     id: pipeline?.id,
     filename: pipeline?.filename,

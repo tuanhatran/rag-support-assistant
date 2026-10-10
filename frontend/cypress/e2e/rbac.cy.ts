@@ -4,7 +4,9 @@ describe('Role-based access and isolation', () => {
   let user: Credentials
 
   beforeEach(() => {
-    cy.registerUser('standard').then(created => { user = created })
+    cy.registerUser('standard').then((created) => {
+      user = created
+    })
   })
 
   afterEach(() => cy.deleteUser(user))
@@ -15,7 +17,12 @@ describe('Role-based access and isolation', () => {
   })
 
   it('rejects admin endpoints for regular users', () => {
-    for (const path of ['/api/admin/users', '/api/admin/connections', '/api/admin/audit', '/api/admin/feedback/stats']) {
+    for (const path of [
+      '/api/admin/users',
+      '/api/admin/connections',
+      '/api/admin/audit',
+      '/api/admin/feedback/stats',
+    ]) {
       cy.request({ url: path, failOnStatusCode: false }).its('status').should('eq', 403)
     }
   })
@@ -29,8 +36,10 @@ describe('Role-based access and isolation', () => {
 
   it('keeps conversations private to their owner', () => {
     cy.seedConversation('My VPN is stuck on Connecting').then(({ sessionId }) => {
-      cy.registerUser('standard').then(other => {
-        cy.request({ url: `/api/chat/sessions/${sessionId}`, failOnStatusCode: false }).its('status').should('eq', 404)
+      cy.registerUser('standard').then((other) => {
+        cy.request({ url: `/api/chat/sessions/${sessionId}`, failOnStatusCode: false })
+          .its('status')
+          .should('eq', 404)
         cy.request('/api/chat/sessions').its('body').should('have.length', 0)
         cy.deleteUser(other)
       })

@@ -55,7 +55,7 @@ describe('Login screen', () => {
     it('shows the three plans with their assigned model', () => {
       cy.get('.plan-option').should('have.length', 3)
       cy.get('.plan-option.selected').should('contain', 'standard')
-      cy.get('.plan-option').each($plan => {
+      cy.get('.plan-option').each(($plan) => {
         expect($plan.find('small').text()).not.to.equal('Model unavailable')
         expect($plan.find('small').text()).not.to.equal('')
       })

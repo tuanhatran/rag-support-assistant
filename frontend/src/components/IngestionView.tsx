@@ -32,9 +32,10 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
   }
 
   useEffect(() => {
-    ingestionApi.getIngestionOptions()
+    ingestionApi
+      .getIngestionOptions()
       .then(setOptions)
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load options'))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load options'))
 
     loadHistory()
   }, [])
@@ -68,7 +69,10 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
         <div>
           <span className="eyebrow">DOCUMENT INGESTION &amp; EMBEDDING</span>
           <h2>Document Ingestion Pipeline</h2>
-          <p>Upload documentation to parse, redact sensitive data, chunk, embed, and store vectors in PostgreSQL pgvector.</p>
+          <p>
+            Upload documentation to parse, redact sensitive data, chunk, embed, and store vectors in PostgreSQL
+            pgvector.
+          </p>
         </div>
       </div>
 
@@ -78,11 +82,7 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
             <CheckCircle2 size={18} />
             <span>
               Ingestion pipeline created successfully! <b>ID:</b>{' '}
-              <button
-                type="button"
-                className="pipeline-id-link"
-                onClick={() => onOpenPipeline(submittedPipelineId)}
-              >
+              <button type="button" className="pipeline-id-link" onClick={() => onOpenPipeline(submittedPipelineId)}>
                 {submittedPipelineId}
               </button>
             </span>
@@ -97,9 +97,23 @@ export function IngestionView({ onOpenPipeline }: IngestionViewProps) {
         </div>
       )}
 
-      <IngestionForm options={options} submitting={submitting} error={error} onError={setError} onSelectionChange={() => setSubmittedPipelineId(null)} onSubmit={handleSubmit} />
+      <IngestionForm
+        options={options}
+        submitting={submitting}
+        error={error}
+        onError={setError}
+        onSelectionChange={() => setSubmittedPipelineId(null)}
+        onSubmit={handleSubmit}
+      />
 
-      <PipelineHistory pipelines={history} loading={loadingHistory} error={historyError} onRefresh={loadHistory} onDismissError={() => setHistoryError('')} onOpen={onOpenPipeline} />
+      <PipelineHistory
+        pipelines={history}
+        loading={loadingHistory}
+        error={historyError}
+        onRefresh={loadHistory}
+        onDismissError={() => setHistoryError('')}
+        onOpen={onOpenPipeline}
+      />
     </section>
   )
 }
