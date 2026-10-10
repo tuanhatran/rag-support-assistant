@@ -1,0 +1,20 @@
+:root {
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  color: #192521;
+  background: #f1f3ef;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --ink: #192521;
+  --muted: #718078;
+  --faint: #9ba69f;
+  --line: #dfe5df;
+  --surface: #fff;
+  --canvas: #f1f3ef;
+  --green: #176c54;
+  --green-dark: #124b3e;
+  --green-soft: #e5f2eb;
+  --lime: #d9ec83;
+  --coral: #c45b42;
+  --coral-soft: #fff0e9;
+  --mono: 'DM Mono', Consolas, monospace;
+}

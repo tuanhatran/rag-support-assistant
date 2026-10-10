@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react'
 import { Check, X } from 'lucide-react'
-import { api } from '../api'
-import type { Policy } from '../types'
+import { acceptPolicy, getPolicy } from '../api/privacy'
+import type { Policy } from '../types/privacy'
 
 export function PolicyModal({ blocking, onAccept, onClose }: { blocking?: boolean; onAccept?: () => void; onClose?: () => void }) {
   const [policy, setPolicy] = useState<Policy | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    api.get<Policy>('/privacy/policy').then(setPolicy).catch(() => setPolicy(null))
+    getPolicy().then(setPolicy).catch(() => setPolicy(null))
   }, [])
 
   async function accept() {
     if (!onAccept) return
     setBusy(true)
     try {
-      await api.post('/privacy/consent', { accepted: true })
+      await acceptPolicy()
       onAccept()
     } finally {
       setBusy(false)

@@ -1,6 +1,6 @@
 # Fieldnote Support Assistant File Graph
 
-Updated: 2026-10-08
+Updated: 2026-10-10
 
 ## Backend Modules
 
@@ -75,19 +75,55 @@ Updated: 2026-10-08
 
 | File | Responsibility |
 | --- | --- |
-| `frontend/src/App.tsx` | Session bootstrap, navigation, policy blocking |
-| `frontend/src/api.ts` | Same-origin JSON requests and global 401 handler |
-| `frontend/src/types.ts` | API/domain types |
-| `frontend/src/components/LoginPage.tsx` | Sign-in, registration, plan selection |
-| `frontend/src/components/PolicyModal.tsx` | Versioned policy and consent |
-| `frontend/src/components/ChatView.tsx` | Sessions, composer, answers, sources, feedback |
-| `frontend/src/components/DocumentsView.tsx` | Search/filter and rendered runbooks |
-| `frontend/src/components/PrivacyView.tsx` | Policy, export, erase, account deletion |
-| `frontend/src/components/AdminView.tsx` | Connections, row-local staged user role/plan edits with per-row save locking, feedback, audit, ingestion routing |
-| `frontend/src/components/IngestionView.tsx` | Document upload form, chunking/model options, and pipeline history list |
-| `frontend/src/components/IngestionPipelineView.tsx` | Pipeline stage cards, polling, chunk inspector, extracted text, export payload |
+| `frontend/src/App.tsx` | Session bootstrap, unauthorized-session handling, sign-in/sign-out transitions |
+| `frontend/src/components/AppShell.tsx` | Authenticated header, navigation, active-view composition, consent gate |
+| `frontend/src/api.ts` | Same-origin JSON transport, credentials, error mapping, global 401 handler |
+| `frontend/src/api/auth.ts` | Sign-in, registration, plan lookup, current user, sign-out contracts |
+| `frontend/src/api/chat.ts` | Session, message, and feedback endpoint contracts |
+| `frontend/src/api/documents.ts` | Document list filters and detail lookup contracts |
+| `frontend/src/api/privacy.ts` | Policy, consent, export, erasure, and account-deletion contracts |
+| `frontend/src/api/admin.ts` | Connection, user, feedback, and audit endpoint contracts |
+| `frontend/src/api/ingestion.ts` | Ingestion options, pipeline, and chunk endpoint contracts |
+| `frontend/src/types.ts` | Compatibility barrel for domain contracts |
+| `frontend/src/types/account.ts` | User, role, plan, and plan-option contracts |
+| `frontend/src/types/chat.ts` | Chat session, message, source, and rating contracts |
+| `frontend/src/types/documents.ts` | Knowledge-base document contract |
+| `frontend/src/types/connections.ts` | LLM connection contract |
+| `frontend/src/types/privacy.ts` | Versioned policy contract |
+| `frontend/src/types/ingestion.ts` | Ingestion options, stages, pipelines, and chunk contracts |
+| `frontend/src/types/admin.ts` | Admin API models and connection form payload |
+| `frontend/src/components/LoginPage.tsx` | Authentication shell, brand panel, policy-modal ownership |
+| `frontend/src/components/auth/AccountForm.tsx` | Sign-in, registration, plan selection, and form validation |
+| `frontend/src/components/PolicyModal.tsx` | Versioned policy loading and consent submission |
+| `frontend/src/components/ChatView.tsx` | Chat session lifecycle, API actions, retention/error/notice state |
+| `frontend/src/components/chat/ConversationRail.tsx` | Conversation selection, creation/deletion controls, document navigation |
+| `frontend/src/components/chat/ChatTranscript.tsx` | Welcome suggestions, answer rendering, citations, ratings |
+| `frontend/src/components/chat/MessageComposer.tsx` | Question input, keyboard submission, notices, data-policy link |
+| `frontend/src/components/chat/FeedbackDialog.tsx` | Detailed answer feedback form and local selection state |
+| `frontend/src/components/chat/SourceDialog.tsx` | Cited runbook modal |
+| `frontend/src/components/DocumentsView.tsx` | Document query/filter lifecycle and selected-document state |
+| `frontend/src/components/documents/DocumentList.tsx` | Search/filter controls, document rows, tags, empty/error states |
+| `frontend/src/components/documents/DocumentReader.tsx` | Selected runbook rendering and empty reader state |
+| `frontend/src/components/PrivacyView.tsx` | Policy/data-rights loading, actions, and feedback state |
+| `frontend/src/components/privacy/PolicySummary.tsx` | Current policy summary and full-policy action |
+| `frontend/src/components/privacy/PrivacyActions.tsx` | Export, conversation erasure, and account-deletion controls |
+| `frontend/src/components/AdminView.tsx` | Admin workflow orchestration, API mutations, tab selection, ingestion routing |
+| `frontend/src/components/admin/ConnectionsSection.tsx` | LLM connection list, missing-plan warning, connection actions |
+| `frontend/src/components/admin/ConnectionDialog.tsx` | Create/edit connection form and provider-specific fields |
+| `frontend/src/components/admin/UsersSection.tsx` | User table, row-local staged role/plan edits, and save locking UI |
+| `frontend/src/components/admin/FeedbackSection.tsx` | Feedback rating filter, statistics, and feedback entries |
+| `frontend/src/components/admin/AuditSection.tsx` | Audit filters, event table, and empty state |
+| `frontend/src/components/admin/types.ts` | Admin tab state and shared plan labels; re-exports admin API models |
+| `frontend/src/components/IngestionView.tsx` | Ingestion options/history loading, submission, and pipeline routing |
+| `frontend/src/components/ingestion/IngestionForm.tsx` | File validation, upload selection, chunking/model form state |
+| `frontend/src/components/ingestion/PipelineHistory.tsx` | Pipeline history refresh, loading/error/empty states, and selection |
+| `frontend/src/components/IngestionPipelineView.tsx` | Pipeline polling, summary metadata, and error state |
+| `frontend/src/components/ingestion/PipelineStages.tsx` | Pipeline stage status and latency cards |
+| `frontend/src/components/ingestion/PipelineDetails.tsx` | Chunk, extracted-text, and export tabs with clipboard state |
+| `frontend/src/components/ingestion/pipelinePayload.ts` | Shared export payload construction for display and clipboard |
 | `frontend/src/components/Markdown.tsx` | GFM Markdown rendering |
-| `frontend/src/styles.css` | Responsive application styling |
+| `frontend/src/styles.css` | Responsive application and component styling |
+| `frontend/src/styles/tokens.css` | Shared design tokens and root typography/colors |
 
 ## Frontend E2E Tests (Cypress)
 
@@ -103,7 +139,7 @@ Updated: 2026-10-08
 | `frontend/cypress/e2e/chat.cy.ts` | AI Chat: suggestions, answers, sources, feedback, redaction, conversations |
 | `frontend/cypress/e2e/documents.cy.ts` | Documents: list, search, category, tag, reader |
 | `frontend/cypress/e2e/privacy.cy.ts` | Privacy: policy, export, erase, account deletion |
-| `frontend/cypress/e2e/admin.cy.ts` | Admin tabs, user role/plan edit confirmation/cancellation, delayed-save locking and last-admin protection (needs `CYPRESS_ADMIN_USERNAME` / `CYPRESS_ADMIN_PASSWORD`) |
+| `frontend/cypress/e2e/admin.cy.ts` | Admin tabs, connection management, user role/plan edit confirmation/cancellation, delayed-save locking and last-admin protection, feedback, and audit (needs running stack and `CYPRESS_ADMIN_USERNAME` / `CYPRESS_ADMIN_PASSWORD`) |
 | `frontend/cypress/e2e/rbac.cy.ts` | Admin guards, unauthenticated access, per-user conversation isolation |
 
 ## Operations
