@@ -12,22 +12,39 @@ export default function App() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => setUser(null))
-    getCurrentUser().then(setUser).catch(() => setUser(null)).finally(() => setLoading(false))
+    getCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false))
     return () => setUnauthorizedHandler(null)
   }, [])
 
   async function signOut() {
-    try { await signOutRequest() } catch { /* The local session still needs to close. */ }
+    try {
+      await signOutRequest()
+    } catch {
+      /* The local session still needs to close. */
+    }
     setUser(null)
   }
 
-  if (loading) return <div className="loading-screen"><span className="brand-mark"><BookOpenCheck size={21} /></span><span>Opening your workspace...</span></div>
+  if (loading)
+    return (
+      <div className="loading-screen">
+        <span className="brand-mark">
+          <BookOpenCheck size={21} />
+        </span>
+        <span>Opening your workspace...</span>
+      </div>
+    )
   if (!user) return <LoginPage onAuthenticated={setUser} />
 
-  return <AppShell
-    user={user}
-    onSignOut={signOut}
-    onDeleted={() => setUser(null)}
-    onPolicyAccepted={() => setUser(current => current ? { ...current, policy_accepted: true } : current)}
-  />
+  return (
+    <AppShell
+      user={user}
+      onSignOut={signOut}
+      onDeleted={() => setUser(null)}
+      onPolicyAccepted={() => setUser((current) => (current ? { ...current, policy_accepted: true } : current))}
+    />
+  )
 }

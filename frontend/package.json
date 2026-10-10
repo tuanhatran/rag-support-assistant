@@ -7,7 +7,9 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "cy:open": "cypress open",
+    "git pucy:open": "cypress open",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css}\" \"cypress/**/*.{ts,tsx,js,jsx}\" index.html vite.config.ts cypress.config.ts cypress/tsconfig.json \"tsconfig*.json\" package.json package-lock.json .prettierrc.json ../.github/workflows/ci.yml",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css}\" \"cypress/**/*.{ts,tsx,js,jsx}\" index.html vite.config.ts cypress.config.ts cypress/tsconfig.json \"tsconfig*.json\" package.json package-lock.json .prettierrc.json ../.github/workflows/ci.yml",
     "e2e": "cypress run"
   },
   "dependencies": {
@@ -23,6 +25,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "cypress": "^15.21.1",
     "dotenv": "^16.4.7",
+    "prettier": "^3.9.10",
     "typescript": "~5.7.2",
     "vite": "^6.0.7"
   }

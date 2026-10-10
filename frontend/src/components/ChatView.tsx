@@ -29,7 +29,7 @@ export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void 
   async function refreshSessions(preferred?: string) {
     const rows = await chatApi.listSessions()
     setSessions(rows)
-    const target = rows.find(row => row.id === preferred) ?? rows[0]
+    const target = rows.find((row) => row.id === preferred) ?? rows[0]
     if (target) await openSession(target.id)
     else setActive(null)
   }
@@ -40,21 +40,28 @@ export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void 
   }
 
   useEffect(() => {
-    refreshSessions().catch(reason => setError(reason.message)).finally(() => setLoading(false))
+    refreshSessions()
+      .catch((reason) => setError(reason.message))
+      .finally(() => setLoading(false))
     getPolicy()
-      .then(policy => setRetention(policy.retention)).catch(() => undefined)
+      .then((policy) => setRetention(policy.retention))
+      .catch(() => undefined)
   }, [])
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [active?.messages?.length, sending])
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [active?.messages?.length, sending])
 
   async function newConversation() {
     setError('')
     try {
       const created = await chatApi.createSession()
       setActive({ ...created, messages: [] })
-      setSessions(current => [created, ...current])
+      setSessions((current) => [created, ...current])
       inputRef.current?.focus()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to start a conversation.') }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to start a conversation.')
+    }
   }
 
   async function removeSession(id: string) {
@@ -63,7 +70,9 @@ export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void 
       await chatApi.deleteSession(id)
       if (active?.id === id) setActive(null)
       await refreshSessions()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to delete conversation.') }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to delete conversation.')
+    }
   }
 
   async function send(raw = question) {
@@ -80,28 +89,42 @@ export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void 
         setActive(session)
       }
       const message = await chatApi.sendMessage(session.id, value)
-      const updated = { ...session, title: session.messages?.length ? session.title : value.slice(0, 60), messages: [...(session.messages ?? []), message] }
+      const updated = {
+        ...session,
+        title: session.messages?.length ? session.title : value.slice(0, 60),
+        messages: [...(session.messages ?? []), message],
+      }
       setActive(updated)
-      setSessions(current => [updated, ...current.filter(item => item.id !== session!.id)])
+      setSessions((current) => [updated, ...current.filter((item) => item.id !== session!.id)])
       inputRef.current?.focus()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'The answer could not be generated.')
       setQuestion(value)
-    } finally { setSending(false) }
+    } finally {
+      setSending(false)
+    }
   }
 
   async function openSource(item: Source) {
-    try { setSource(await getDocument(item.document_id)) }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Document could not be opened.') }
+    try {
+      setSource(await getDocument(item.document_id))
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Document could not be opened.')
+    }
   }
 
   async function rate(message: Message, rating: Rating) {
     if (!active) return
-    if (rating === 'down') { setFeedback(message); return }
+    if (rating === 'down') {
+      setFeedback(message)
+      return
+    }
     try {
       await chatApi.submitFeedback(active.id, message.id, rating, [], '')
       setNotice('Thanks for rating this answer.')
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Feedback could not be saved.') }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Feedback could not be saved.')
+    }
   }
 
   async function submitFeedback(categories: string[], comment: string) {
@@ -110,20 +133,71 @@ export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void 
       await chatApi.submitFeedback(active.id, feedback.id, 'down', categories, comment)
       setFeedback(null)
       setNotice('Thanks. Your feedback has been recorded.')
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Feedback could not be saved.') }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Feedback could not be saved.')
+    }
   }
 
-  return <div className="chat-layout">
-    <ConversationRail sessions={sessions} activeSessionId={active?.id} loading={loading} onCreate={newConversation} onSelect={openSession} onDelete={removeSession} onBrowseDocuments={onBrowseDocuments} />
+  return (
+    <div className="chat-layout">
+      <ConversationRail
+        sessions={sessions}
+        activeSessionId={active?.id}
+        loading={loading}
+        onCreate={newConversation}
+        onSelect={openSession}
+        onDelete={removeSession}
+        onBrowseDocuments={onBrowseDocuments}
+      />
 
-    <section className="chat-panel">
-      <div className="chat-toolbar"><div><span className="eyebrow">IT SUPPORT / ASSISTANT</span><h1>{active?.title && active.title !== 'New conversation' ? active.title : 'How can we help?'}</h1></div><span className="online-label"><span className="status-dot" />READY</span></div>
-      <ChatTranscript active={active} sending={sending} endRef={endRef} onSendSuggestion={question => void send(question)} onBrowseDocuments={onBrowseDocuments} onOpenSource={openSource} onRate={(message, rating) => void rate(message, rating)} />
-      <MessageComposer question={question} sending={sending} error={error} notice={notice} retentionDays={retention.conversations} inputRef={inputRef} onQuestionChange={setQuestion} onSend={() => void send()} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} onOpenPolicy={() => setPolicyOpen(true)} />
-    </section>
+      <section className="chat-panel">
+        <div className="chat-toolbar">
+          <div>
+            <span className="eyebrow">IT SUPPORT / ASSISTANT</span>
+            <h1>{active?.title && active.title !== 'New conversation' ? active.title : 'How can we help?'}</h1>
+          </div>
+          <span className="online-label">
+            <span className="status-dot" />
+            READY
+          </span>
+        </div>
+        <ChatTranscript
+          active={active}
+          sending={sending}
+          endRef={endRef}
+          onSendSuggestion={(question) => void send(question)}
+          onBrowseDocuments={onBrowseDocuments}
+          onOpenSource={openSource}
+          onRate={(message, rating) => void rate(message, rating)}
+        />
+        <MessageComposer
+          question={question}
+          sending={sending}
+          error={error}
+          notice={notice}
+          retentionDays={retention.conversations}
+          inputRef={inputRef}
+          onQuestionChange={setQuestion}
+          onSend={() => void send()}
+          onDismissError={() => setError('')}
+          onDismissNotice={() => setNotice('')}
+          onOpenPolicy={() => setPolicyOpen(true)}
+        />
+      </section>
 
-    {source && <SourceDialog source={source} onClose={() => setSource(null)} />}
-    {feedback && <FeedbackDialog retentionDays={retention.feedback} onClose={() => setFeedback(null)} onOpenPolicy={() => { setFeedback(null); setPolicyOpen(true) }} onSubmit={(categories, comment) => void submitFeedback(categories, comment)} />}
-    {policyOpen && <PolicyModal onClose={() => setPolicyOpen(false)} />}
-  </div>
+      {source && <SourceDialog source={source} onClose={() => setSource(null)} />}
+      {feedback && (
+        <FeedbackDialog
+          retentionDays={retention.feedback}
+          onClose={() => setFeedback(null)}
+          onOpenPolicy={() => {
+            setFeedback(null)
+            setPolicyOpen(true)
+          }}
+          onSubmit={(categories, comment) => void submitFeedback(categories, comment)}
+        />
+      )}
+      {policyOpen && <PolicyModal onClose={() => setPolicyOpen(false)} />}
+    </div>
+  )
 }

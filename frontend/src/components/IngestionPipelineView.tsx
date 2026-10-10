@@ -82,12 +82,18 @@ export function IngestionPipelineView({ pipelineId, onBack }: IngestionPipelineV
               )}
             </div>
             <p className="pipeline-meta">
-              <span>Pipeline ID: <code>{pipelineId}</code></span>
+              <span>
+                Pipeline ID: <code>{pipelineId}</code>
+              </span>
               {pipeline && (
                 <>
                   <span>Size: {(pipeline.file_size / 1024).toFixed(1)} KB</span>
-                  <span>Model: <b>{pipeline.options.embedding_model}</b></span>
-                  <span>Total Latency: <b>{totalLatencyMs} ms</b></span>
+                  <span>
+                    Model: <b>{pipeline.options.embedding_model}</b>
+                  </span>
+                  <span>
+                    Total Latency: <b>{totalLatencyMs} ms</b>
+                  </span>
                 </>
               )}
             </p>

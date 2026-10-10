@@ -8,17 +8,28 @@ const openTab = (name: string) => cy.contains('[role="tab"]', name).click()
 describe('Admin screen', () => {
   let user: Credentials
 
-  before(function () { requireAdmin(this) })
+  before(function () {
+    requireAdmin(this)
+  })
 
   beforeEach(() => {
     // The user is created first because registration replaces the session cookie.
-    cy.registerUser('standard').then(created => {
+    cy.registerUser('standard').then((created) => {
       user = created
       cy.seedConversation('My VPN is stuck on Connecting').then(({ sessionId, messageId }) => {
         cy.request({
-          method: 'POST', url: '/api/feedback',
-          body: { session_id: sessionId, message_id: messageId, rating: 'down', categories: ['incorrect'], comment: 'e2e feedback comment' },
-        }).its('status').should('eq', 200)
+          method: 'POST',
+          url: '/api/feedback',
+          body: {
+            session_id: sessionId,
+            message_id: messageId,
+            rating: 'down',
+            categories: ['incorrect'],
+            comment: 'e2e feedback comment',
+          },
+        })
+          .its('status')
+          .should('eq', 200)
       })
     })
     cy.adminLogin()
@@ -33,14 +44,23 @@ describe('Admin screen', () => {
     if (!adminCredentials()) return
     cy.adminLogin()
     cy.request('/api/admin/connections').then(({ body }) => {
-      body.filter((item: { name: string; plans: string[] }) => item.name.startsWith('e2e-conn-') && !item.plans.length)
-        .forEach((item: { id: string }) => cy.request({ method: 'DELETE', url: `/api/admin/connections/${item.id}`, failOnStatusCode: false }))
+      body
+        .filter((item: { name: string; plans: string[] }) => item.name.startsWith('e2e-conn-') && !item.plans.length)
+        .forEach((item: { id: string }) =>
+          cy.request({ method: 'DELETE', url: `/api/admin/connections/${item.id}`, failOnStatusCode: false }),
+        )
     })
   })
 
   it('shows the 5 admin tabs', () => {
-    cy.get('[role="tab"]').then($tabs => {
-      expect($tabs.toArray().map(tab => tab.textContent)).to.deep.equal(['LLM connections','Ingestion', 'Users', 'Chat feedback', 'Audit log'])
+    cy.get('[role="tab"]').then(($tabs) => {
+      expect($tabs.toArray().map((tab) => tab.textContent)).to.deep.equal([
+        'LLM connections',
+        'Ingestion',
+        'Users',
+        'Chat feedback',
+        'Audit log',
+      ])
     })
     cy.contains('[role="tab"]', 'LLM connections').should('have.attr', 'aria-selected', 'true')
   })
@@ -70,7 +90,10 @@ describe('Admin screen', () => {
       cy.get(`button[aria-label="Edit ${connectionName}"]`).click()
       cy.get('[role="dialog"]').within(() => {
         cy.contains('h2', 'Edit connection')
-        cy.contains('label', /^Max tokens/).find('input').clear().type('800')
+        cy.contains('label', /^Max tokens/)
+          .find('input')
+          .clear()
+          .type('800')
         cy.contains('button', 'Save connection').click()
       })
       cy.get('.page-alert').should('contain', 'Connection updated.')
@@ -109,9 +132,11 @@ describe('Admin screen', () => {
       cy.get('@userRow').find('button[aria-label^="Edit "]').click()
       cy.get('@userRow').find('select').eq(0).select('admin')
       cy.get('@userRow').find('select').eq(1).select('premium')
-      cy.request('/api/admin/users').its('body').then((users: { username: string; plan: string }[]) => {
-        expect(users.find(item => item.username === user.username)?.plan).to.equal('standard')
-      })
+      cy.request('/api/admin/users')
+        .its('body')
+        .then((users: { username: string; plan: string }[]) => {
+          expect(users.find((item) => item.username === user.username)?.plan).to.equal('standard')
+        })
       cy.get('@userRow').contains('button', 'Cancel').click()
       cy.get('@userRow').find('select').should('not.exist')
       cy.get('@userRow').should('contain', 'user').and('contain', 'standard')
@@ -135,8 +160,8 @@ describe('Admin screen', () => {
     })
 
     it('locks row edits until a delayed user update finishes', () => {
-      cy.intercept('PATCH', '/api/admin/users/*', request => {
-        request.continue(response => response.setDelay(1200))
+      cy.intercept('PATCH', '/api/admin/users/*', (request) => {
+        request.continue((response) => response.setDelay(1200))
       }).as('updateUser')
       cy.contains('tr', user.username).as('userRow')
       cy.get('@userRow').find('button[aria-label^="Edit "]').click()
@@ -158,7 +183,9 @@ describe('Admin screen', () => {
       cy.get('@userRow').find('select').should('not.exist')
       cy.get('@userRow').should('contain', 'admin').and('contain', 'premium')
       cy.request('/api/admin/users').then(({ body }) => {
-        const savedUser = (body as { username: string; role: string; plan: string }[]).find(item => item.username === user.username)
+        const savedUser = (body as { username: string; role: string; plan: string }[]).find(
+          (item) => item.username === user.username,
+        )
         expect(savedUser).to.include({ role: 'admin', plan: 'premium' })
       })
       cy.get('@updateUser.all').should('have.length', 1)
@@ -191,8 +218,10 @@ describe('Admin screen', () => {
         cy.get('@adminRow').find('select').should('not.exist')
         cy.get('@adminRow').should('contain', 'admin').and('contain', admin.plan)
         cy.request('/api/admin/users').then(({ body: refreshedUsers }) => {
-          expect(refreshedUsers.find((item: { username: string }) => item.username === admin.username))
-            .to.include({ role: 'admin', plan: admin.plan })
+          expect(refreshedUsers.find((item: { username: string }) => item.username === admin.username)).to.include({
+            role: 'admin',
+            plan: admin.plan,
+          })
         })
       })
     })
@@ -204,7 +233,9 @@ describe('Admin screen', () => {
     it('shows the statistics and the submitted feedback', () => {
       cy.get('.stat-cell').should('have.length', 4)
       cy.get('.stats-strip').should('contain', 'TOTAL RATINGS').and('contain', 'SATISFACTION')
-      cy.contains('.feedback-card', user.username).should('contain', 'Not helpful').and('contain', 'e2e feedback comment')
+      cy.contains('.feedback-card', user.username)
+        .should('contain', 'Not helpful')
+        .and('contain', 'e2e feedback comment')
     })
 
     it('filters by rating', () => {

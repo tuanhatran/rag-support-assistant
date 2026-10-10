@@ -4,7 +4,9 @@ describe('Documents screen', () => {
   let credentials: Credentials
 
   beforeEach(() => {
-    cy.registerUser('basic').then(created => { credentials = created })
+    cy.registerUser('basic').then((created) => {
+      credentials = created
+    })
     cy.visit('/')
     cy.get('nav[aria-label="Main navigation"]').contains('button', 'Documents').click()
     cy.get('.document-row').should('have.length', 10)

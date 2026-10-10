@@ -7,7 +7,9 @@ describe('AI Chat screen', () => {
   let credentials: Credentials
 
   beforeEach(() => {
-    cy.registerUser('standard').then(created => { credentials = created })
+    cy.registerUser('standard').then((created) => {
+      credentials = created
+    })
     cy.visit('/')
   })
 
@@ -72,10 +74,12 @@ describe('AI Chat screen', () => {
     cy.contains('.feedback-options label', 'Too slow').find('input').check()
     cy.get('textarea.text-area').type('The steps did not match my client.')
     cy.contains('[role="dialog"] button', 'Submit feedback').click()
-    cy.wait('@feedback').its('request.body').should(body => {
-      expect(body.rating).to.equal('down')
-      expect(body.categories).to.have.members(['incorrect', 'too_slow'])
-    })
+    cy.wait('@feedback')
+      .its('request.body')
+      .should((body) => {
+        expect(body.rating).to.equal('down')
+        expect(body.categories).to.have.members(['incorrect', 'too_slow'])
+      })
     cy.get('[role="dialog"]').should('not.exist')
     cy.get('.inline-success').should('contain', 'Your feedback has been recorded.')
   })

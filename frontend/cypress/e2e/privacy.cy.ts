@@ -6,7 +6,9 @@ describe('Privacy screen', () => {
   let credentials: Credentials
 
   beforeEach(() => {
-    cy.registerUser('standard').then(created => { credentials = created })
+    cy.registerUser('standard').then((created) => {
+      credentials = created
+    })
   })
 
   afterEach(() => cy.deleteUser(credentials))
@@ -51,8 +53,14 @@ describe('Privacy screen', () => {
     cy.contains('button', 'Delete account permanently').click()
     cy.wait('@deleteAccount').its('response.statusCode').should('eq', 401)
     cy.request({
-      method: 'POST', url: '/api/auth/login', body: credentials, log: false, failOnStatusCode: false,
-    }).its('status').should('eq', 200)
+      method: 'POST',
+      url: '/api/auth/login',
+      body: credentials,
+      log: false,
+      failOnStatusCode: false,
+    })
+      .its('status')
+      .should('eq', 200)
   })
 
   it('deletes the account and returns to the login screen', () => {
@@ -62,7 +70,13 @@ describe('Privacy screen', () => {
     cy.contains('button', 'Delete account permanently').click()
     cy.contains('h2', 'Welcome back').should('be.visible')
     cy.request({
-      method: 'POST', url: '/api/auth/login', body: credentials, log: false, failOnStatusCode: false,
-    }).its('status').should('eq', 401)
+      method: 'POST',
+      url: '/api/auth/login',
+      body: credentials,
+      log: false,
+      failOnStatusCode: false,
+    })
+      .its('status')
+      .should('eq', 401)
   })
 })
