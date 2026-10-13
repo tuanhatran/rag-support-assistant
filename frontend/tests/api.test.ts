@@ -92,9 +92,15 @@ describe('API transport', () => {
 
   it('parses streamed chat events across arbitrary response chunk boundaries', async () => {
     const completed = {
-      id: 'message-1', question: 'question', answer: 'first answer', status: 'ok', sources: [],
-      model: { name: 'Local', provider: 'openai', model: 'configured-model' }, latency_ms: 14,
-      redacted: false, created_at: '2026-01-01T00:00:00Z',
+      id: 'message-1',
+      question: 'question',
+      answer: 'first answer',
+      status: 'ok',
+      sources: [],
+      model: { name: 'Local', provider: 'openai', model: 'configured-model' },
+      latency_ms: 14,
+      redacted: false,
+      created_at: '2026-01-01T00:00:00Z',
     }
     const bytes = new TextEncoder().encode(
       `event: chunk\ndata: {"text":"first "}\n\nevent: chunk\ndata: {"text":"answer"}\n\nevent: done\ndata: ${JSON.stringify(completed)}\n\n`,
@@ -107,37 +113,55 @@ describe('API transport', () => {
         controller.close()
       },
     })
-    fetchMock.mockResolvedValue(new Response(body, {
-      status: 200,
-      headers: { 'Content-Type': 'text/event-stream' },
-    }))
+    fetchMock.mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    )
     const onChunk = vi.fn()
 
     await expect(chat.sendMessage('session-1', 'question', onChunk)).resolves.toEqual(completed)
     expect(onChunk.mock.calls).toEqual([['first '], ['first answer']])
-    expect(fetchMock).toHaveBeenCalledWith('/api/chat/sessions/session-1/messages', expect.objectContaining({
-      method: 'POST',
-      body: '{"question":"question"}',
-      credentials: 'same-origin',
-    }))
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/chat/sessions/session-1/messages',
+      expect.objectContaining({
+        method: 'POST',
+        body: '{"question":"question"}',
+        credentials: 'same-origin',
+      }),
+    )
   })
 
   it('logs safe structured metadata for completed JSON chat requests', async () => {
     const sensitive = [
-      'question-secret', 'answer-secret', 'prompt-secret', 'credential-secret', 'token-secret',
-      'api-key-secret', 'session-token-secret',
+      'question-secret',
+      'answer-secret',
+      'prompt-secret',
+      'credential-secret',
+      'token-secret',
+      'api-key-secret',
+      'session-token-secret',
     ]
     const completed = {
-      id: 'message-1', question: sensitive[0], answer: sensitive[1], status: 'ok', sources: [],
-      model: { name: sensitive.slice(2).join(' '), provider: 'openai', model: 'local-model:14b' }, latency_ms: 14,
-      redacted: false, created_at: '2026-01-01T00:00:00Z',
+      id: 'message-1',
+      question: sensitive[0],
+      answer: sensitive[1],
+      status: 'ok',
+      sources: [],
+      model: { name: sensitive.slice(2).join(' '), provider: 'openai', model: 'local-model:14b' },
+      latency_ms: 14,
+      redacted: false,
+      created_at: '2026-01-01T00:00:00Z',
     }
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    fetchMock.mockResolvedValue(new Response(JSON.stringify(completed), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'request-123' },
-    }))
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(completed), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'request-123' },
+      }),
+    )
 
     await chat.sendMessage('session-1', sensitive[0])
 
@@ -145,8 +169,12 @@ describe('API transport', () => {
     expect(records).toHaveLength(2)
     expect(records[0]).toMatchObject({ event: 'chat.sendMessage', lifecycle: 'start', status: 'start' })
     expect(records[1]).toMatchObject({
-      event: 'chat.sendMessage', lifecycle: 'complete', status: 200, request_id: 'request-123',
-      provider: 'openai', model: 'local-model:14b',
+      event: 'chat.sendMessage',
+      lifecycle: 'complete',
+      status: 200,
+      request_id: 'request-123',
+      provider: 'openai',
+      model: 'local-model:14b',
     })
     expect(records[1].duration_ms).toEqual(expect.any(Number))
     const serialized = JSON.stringify([...info.mock.calls, ...vi.mocked(console.warn).mock.calls])
@@ -157,24 +185,36 @@ describe('API transport', () => {
     const credentialProvider = 'sk-provider-secret-123456'
     const credentialModel = 'sk_live_test_secret_123456'
     const completed = {
-      id: 'message-credential-labels', question: 'question', answer: 'answer', status: 'ok', sources: [],
-      model: { name: 'Local', provider: credentialProvider, model: credentialModel }, latency_ms: 14,
-      redacted: false, created_at: '2026-01-01T00:00:00Z',
+      id: 'message-credential-labels',
+      question: 'question',
+      answer: 'answer',
+      status: 'ok',
+      sources: [],
+      model: { name: 'Local', provider: credentialProvider, model: credentialModel },
+      latency_ms: 14,
+      redacted: false,
+      created_at: '2026-01-01T00:00:00Z',
     }
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    fetchMock.mockResolvedValue(new Response(JSON.stringify(completed), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'request-credential-labels' },
-    }))
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(completed), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'request-credential-labels' },
+      }),
+    )
 
     await chat.sendMessage('session-1', 'question')
 
     const records = info.mock.calls.map(([record]) => record as Record<string, unknown>)
     expect(records[0]).toMatchObject({ lifecycle: 'start', status: 'start' })
     expect(records[1]).toMatchObject({
-      lifecycle: 'complete', status: 200, request_id: 'request-credential-labels',
-      duration_ms: expect.any(Number), provider: undefined, model: undefined,
+      lifecycle: 'complete',
+      status: 200,
+      request_id: 'request-credential-labels',
+      duration_ms: expect.any(Number),
+      provider: undefined,
+      model: undefined,
     })
     const serialized = JSON.stringify([...info.mock.calls, ...warn.mock.calls])
     expect(serialized).not.toContain(credentialProvider)
@@ -185,28 +225,44 @@ describe('API transport', () => {
       id: 'message-ollama-label',
       model: { name: 'DeepSeek R1', provider: 'openai', model: 'deepseek-r1:14b' },
     }
-    fetchMock.mockResolvedValue(new Response(JSON.stringify(ollamaCompleted), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'request-ollama-label' },
-    }))
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(ollamaCompleted), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'request-ollama-label' },
+      }),
+    )
     await chat.sendMessage('session-1', 'question')
 
     const updatedRecords = info.mock.calls.map(([record]) => record as Record<string, unknown>)
     expect(updatedRecords[3]).toMatchObject({
-      lifecycle: 'complete', status: 200, request_id: 'request-ollama-label',
-      duration_ms: expect.any(Number), provider: 'openai', model: 'deepseek-r1:14b',
+      lifecycle: 'complete',
+      status: 200,
+      request_id: 'request-ollama-label',
+      duration_ms: expect.any(Number),
+      provider: 'openai',
+      model: 'deepseek-r1:14b',
     })
   })
 
   it('logs streamed completion metadata without streamed or returned content', async () => {
     const sensitive = [
-      'stream-question-secret', 'stream-answer-secret', 'stream-prompt-secret', 'stream-credential-secret',
-      'stream-api-key-secret', 'stream-session-token-secret',
+      'stream-question-secret',
+      'stream-answer-secret',
+      'stream-prompt-secret',
+      'stream-credential-secret',
+      'stream-api-key-secret',
+      'stream-session-token-secret',
     ]
     const completed = {
-      id: 'message-2', question: sensitive[0], answer: sensitive[1], status: 'ok', sources: [],
-      model: { name: sensitive.slice(2).join(' '), provider: 'openai', model: 'ollama:deepseek-r1' }, latency_ms: 14,
-      redacted: false, created_at: '2026-01-01T00:00:00Z',
+      id: 'message-2',
+      question: sensitive[0],
+      answer: sensitive[1],
+      status: 'ok',
+      sources: [],
+      model: { name: sensitive.slice(2).join(' '), provider: 'openai', model: 'ollama:deepseek-r1' },
+      latency_ms: 14,
+      redacted: false,
+      created_at: '2026-01-01T00:00:00Z',
     }
     const bytes = new TextEncoder().encode(
       `event: chunk\ndata: ${JSON.stringify({ text: sensitive[1] })}\n\nevent: done\ndata: ${JSON.stringify(completed)}\n\n`,
@@ -219,17 +275,22 @@ describe('API transport', () => {
     })
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    fetchMock.mockResolvedValue(new Response(body, {
-      status: 200,
-      headers: { 'Content-Type': 'text/event-stream', 'X-Request-ID': 'stream-request-9' },
-    }))
+    fetchMock.mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream', 'X-Request-ID': 'stream-request-9' },
+      }),
+    )
 
     await chat.sendMessage('session-1', sensitive[0])
 
     const records = info.mock.calls.map(([record]) => record as Record<string, unknown>)
     expect(records[1]).toMatchObject({
-      lifecycle: 'complete', status: 200, request_id: 'stream-request-9',
-      provider: 'openai', model: 'ollama:deepseek-r1',
+      lifecycle: 'complete',
+      status: 200,
+      request_id: 'stream-request-9',
+      provider: 'openai',
+      model: 'ollama:deepseek-r1',
     })
     const serialized = JSON.stringify(info.mock.calls)
     for (const value of sensitive) expect(serialized).not.toContain(value)
@@ -237,23 +298,32 @@ describe('API transport', () => {
 
   it('logs only safe failure class and status when the response body contains sensitive text', async () => {
     const sensitive = [
-      'failure-question-secret', 'failure-body-secret', 'failure-prompt-secret', 'failure-credential-secret',
-      'failure-api-key-secret', 'failure-session-token-secret',
+      'failure-question-secret',
+      'failure-body-secret',
+      'failure-prompt-secret',
+      'failure-credential-secret',
+      'failure-api-key-secret',
+      'failure-session-token-secret',
     ]
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ detail: sensitive.slice(1).join('|') }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'failure-request-5' },
-    }))
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ detail: sensitive.slice(1).join('|') }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'failure-request-5' },
+      }),
+    )
 
     await expect(chat.sendMessage('session-1', sensitive[0])).rejects.toMatchObject({ status: 503 })
 
     expect(info).toHaveBeenCalledOnce()
     expect(warn).toHaveBeenCalledOnce()
     expect(warn.mock.calls[0][0]).toMatchObject({
-      event: 'chat.sendMessage', lifecycle: 'failure', status: 503,
-      request_id: 'failure-request-5', error_class: 'ApiError',
+      event: 'chat.sendMessage',
+      lifecycle: 'failure',
+      status: 503,
+      request_id: 'failure-request-5',
+      error_class: 'ApiError',
     })
     const serialized = JSON.stringify([...info.mock.calls, ...warn.mock.calls])
     for (const value of sensitive) expect(serialized).not.toContain(value)
@@ -271,10 +341,12 @@ describe('API transport', () => {
         controller.error(abortError)
       },
     })
-    fetchMock.mockResolvedValue(new Response(body, {
-      status: 200,
-      headers: { 'Content-Type': 'text/event-stream', 'X-Request-ID': 'cancel-request-2' },
-    }))
+    fetchMock.mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream', 'X-Request-ID': 'cancel-request-2' },
+      }),
+    )
 
     await expect(chat.sendMessage('session-1', sensitive[0])).rejects.toThrow(
       'The configured model could not answer this request.',
@@ -282,7 +354,10 @@ describe('API transport', () => {
 
     expect(warn).toHaveBeenCalledOnce()
     expect(warn.mock.calls[0][0]).toMatchObject({
-      lifecycle: 'cancelled', status: 200, request_id: 'cancel-request-2', error_class: 'Error',
+      lifecycle: 'cancelled',
+      status: 200,
+      request_id: 'cancel-request-2',
+      error_class: 'Error',
     })
     const serialized = JSON.stringify([...info.mock.calls, ...warn.mock.calls])
     for (const value of sensitive) expect(serialized).not.toContain(value)
@@ -291,16 +366,20 @@ describe('API transport', () => {
   it('hides provider error details from streamed chat callers', async () => {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(new TextEncoder().encode(
-          'event: error\ndata: {"message":"The configured model could not answer this request. Please try again or open a support ticket."}\n\n',
-        ))
+        controller.enqueue(
+          new TextEncoder().encode(
+            'event: error\ndata: {"message":"The configured model could not answer this request. Please try again or open a support ticket."}\n\n',
+          ),
+        )
         controller.close()
       },
     })
-    fetchMock.mockResolvedValue(new Response(body, {
-      status: 200,
-      headers: { 'Content-Type': 'text/event-stream' },
-    }))
+    fetchMock.mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    )
 
     await expect(chat.sendMessage('session-1', 'question')).rejects.toThrow(
       'The configured model could not answer this request. Please try again or open a support ticket.',
@@ -345,11 +424,14 @@ describe('endpoint contracts', () => {
       plan: 'premium',
       policy_accepted: true,
     })
-    expect(fetchMock).toHaveBeenCalledWith('/api/chat/sessions/s/1/messages', expect.objectContaining({
-      method: 'POST',
-      body: '{"question":"question"}',
-      credentials: 'same-origin',
-    }))
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/chat/sessions/s/1/messages',
+      expect.objectContaining({
+        method: 'POST',
+        body: '{"question":"question"}',
+        credentials: 'same-origin',
+      }),
+    )
     expect(del).toHaveBeenCalledWith('/chat/sessions/s/1')
   })
 

@@ -4,11 +4,11 @@ Status: DONE
 
 ## Model Routing
 
-| Complexity | Coder | Tester | Reviewer |
-| --- | --- | --- | --- |
-| S | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| M | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| L | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| Complexity | Coder      | Tester     | Reviewer   |
+| ---------- | ---------- | ---------- | ---------- |
+| S          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| M          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| L          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
 
 Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
 
@@ -19,13 +19,13 @@ Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
 - Complexity: M
 - Context files: `.github/context/FILE_GRAPH.md`, `readme.md`, `frontend/src/components/AdminView.tsx`, `frontend/src/styles.css`, `frontend/cypress/e2e/admin.cy.ts`, `frontend/cypress.config.ts`
 - Acceptance criteria:
--  - The Users table has an `Action` column with an accessible pen/edit button for each user row.
--  - Clicking that button enters edit mode for that row; Role and Plan become editable while Username remains unchanged.
--  - Cancel is visible throughout edit mode. It discards staged Role and Plan values, sends no update, and exits edit mode.
--  - Confirm is visible only when staged Role or Plan differs from that row's saved values. Returning both fields to saved values hides Confirm while leaving Cancel available.
--  - Confirm submits all changed fields together through the existing admin user update endpoint. On success, saved Role and Plan display, edit mode ends, and existing notice/error behavior remains intact.
--  - Failed updates do not falsely display staged values as saved and preserve an actionable way to cancel or retry.
--  - Focused Cypress coverage verifies edit entry, no-change controls, staged cancellation with no PATCH, combined Role/Plan confirmation and persistence, and the existing last-admin demotion protection.
+- - The Users table has an `Action` column with an accessible pen/edit button for each user row.
+- - Clicking that button enters edit mode for that row; Role and Plan become editable while Username remains unchanged.
+- - Cancel is visible throughout edit mode. It discards staged Role and Plan values, sends no update, and exits edit mode.
+- - Confirm is visible only when staged Role or Plan differs from that row's saved values. Returning both fields to saved values hides Confirm while leaving Cancel available.
+- - Confirm submits all changed fields together through the existing admin user update endpoint. On success, saved Role and Plan display, edit mode ends, and existing notice/error behavior remains intact.
+- - Failed updates do not falsely display staged values as saved and preserve an actionable way to cancel or retry.
+- - Focused Cypress coverage verifies edit entry, no-change controls, staged cancellation with no PATCH, combined Role/Plan confirmation and persistence, and the existing last-admin demotion protection.
 - Test commands: `cd frontend && npm run e2e -- --spec cypress/e2e/admin.cy.ts`; `cd frontend && npm run build`
 - Fix rounds: 1 / 3
 - Previous stage: Planning

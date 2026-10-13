@@ -8,13 +8,13 @@ The latest recorded project gates pass: the backend suite reports 64 passed and 
 
 ## Verification Results
 
-| Check | Result | Evidence |
-| --- | --- | --- |
-| Backend automated tests | Pass | Latest recorded in RSA-2 handoff: `cd backend && python -m pytest -q -p no:warnings` — 64 passed, 1 skipped in 3.62s |
-| Frontend production build | Pass | Latest recorded in RSA-2 handoff: `cd frontend && npm run build` — TypeScript and Vite production build succeeded in 2.25s |
-| Live provider evaluation | Not run | No external provider request was made |
-| Browser end-to-end evaluation | Not run | This evaluation did not start the full application stack or execute Cypress |
-| Retrieval quality benchmark | Not run | No labeled question-to-source evaluation set or retrieval metrics were collected |
+| Check                         | Result  | Evidence                                                                                                                   |
+| ----------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Backend automated tests       | Pass    | Latest recorded in RSA-2 handoff: `cd backend && python -m pytest -q -p no:warnings` — 64 passed, 1 skipped in 3.62s       |
+| Frontend production build     | Pass    | Latest recorded in RSA-2 handoff: `cd frontend && npm run build` — TypeScript and Vite production build succeeded in 2.25s |
+| Live provider evaluation      | Not run | No external provider request was made                                                                                      |
+| Browser end-to-end evaluation | Not run | This evaluation did not start the full application stack or execute Cypress                                                |
+| Retrieval quality benchmark   | Not run | No labeled question-to-source evaluation set or retrieval metrics were collected                                           |
 
 ## Qualitative Assessment
 

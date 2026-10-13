@@ -4,11 +4,11 @@ Status: DONE
 
 ## Model Routing
 
-| Complexity | Coder | Tester | Reviewer |
-| --- | --- | --- | --- |
-| S | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
-| M | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
-| L | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| Complexity | Coder                      | Tester                     | Reviewer                   |
+| ---------- | -------------------------- | -------------------------- | -------------------------- |
+| S          | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| M          | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| L          | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
 
 Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agent picker.
 
@@ -89,6 +89,7 @@ Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agen
 ## Implementation Summary
 
 ### Changed and Created Files
+
 - `backend/app/embeddings.py` (created): Provider protocol and Cloudflare, local (FastEmbed), and OpenAI providers, with dimension validation.
 - `backend/app/vectorstore.py` (created): PgVectorStore (psycopg async), schema bootstrap, sweep, and FakeVectorStore for unit tests.
 - `backend/app/ingestion.py` (created): Document parsing (.txt and .pdf with redact()), chunking with hard split and carried overlap, option validation, pipeline orchestration, and IngestionService.
@@ -111,6 +112,7 @@ Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agen
 - `.github/context/FILE_GRAPH.md`: Updated modules, routes, collections, tests, and frontend components.
 
 ### Test Verification
+
 - Targeted & Full Backend Suite: `cd backend && python -m pytest -q -p no:warnings`
   - Result: 52 passed, 1 skipped in 2.13s (14 ingestion tests passed, 1 postgres integration test skipped when RAG_PGVECTOR_DSN is unset).
 - Ingestion Targeted Suite: `cd backend && python -m pytest tests/test_ingestion.py -v`
@@ -119,6 +121,7 @@ Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agen
   - Result: TypeScript check and Vite production build succeeded (`tsc -b && vite build` built in 2.27s).
 
 ### Tester Verdict
+
 - Status: READY_FOR_REVIEW
 - Branch verified: `feature/RSA-1-ingestion-pipeline`
 - Acceptance criteria 1-15 verified:
@@ -176,6 +179,7 @@ Re-review will run after the coder's fix round. Fix rounds used: 1 / 3.
 ## Fix Round 1 Summary
 
 ### Addressed Items
+
 1. **Background task retention**: Added `self.background_tasks: set[asyncio.Task]` on `IngestionService`. Added task reference and `task.add_done_callback(self.background_tasks.discard)`. Added test `test_background_tasks_set_holds_and_discards`.
 2. **Failure outside try block**: Moved `running` status update and `admin.ingestion.started` audit event inside the `try:` block in `run_pipeline`. Any error sets `status: failed`, records the failed stage, and audits `admin.ingestion.failed`. Added test `test_pipeline_audit_record_raises_marks_failed`.
 3. **Secret redaction in error messages**: Error text is sanitized via `redact(str(exc))[:200]`. Added test `test_pipeline_error_redaction_secrets` ensuring leaked `sk-` tokens are redacted and absent from the GET response.
@@ -185,9 +189,11 @@ Re-review will run after the coder's fix round. Fix rounds used: 1 / 3.
 7. **DSN placeholder in `.env.example`**: Updated `RAG_PGVECTOR_DSN` with `<password>` placeholder and added a comment explaining Compose automatically supplies the environment variable.
 8. **Clipboard rejection handling**: Wrapped `navigator.clipboard.writeText` in try/catch in `IngestionPipelineView.tsx` and surfaces error message on rejection.
 9. **Hygiene**: Reverted `frontend/tsconfig.app.tsbuildinfo` modification.
+
 - **Non-blocking notes**: Documented overlap edge case in `chunk_text` docstring; added `expected_count` validation in `validate_embedding_dimensions` and test `test_validate_embedding_dimensions_count_mismatch`.
 
 ### Test Verification
+
 - Ingestion Targeted Suite: `cd backend && python -m pytest tests/test_ingestion.py -v` (19 passed, 1 skipped).
 - Full Backend Suite: `cd backend && python -m pytest -q -p no:warnings` (57 passed, 1 skipped in 2.59s).
 - Frontend Build: `cd frontend && npm run build` (Clean build in 2.25s).
@@ -195,6 +201,7 @@ Re-review will run after the coder's fix round. Fix rounds used: 1 / 3.
 @tester: use Gemini 3.8 Flash (copilot). Verify the fix round against the reviewer's change requests and run the test gate. Do not commit or push.
 
 ### Tester Verdict (Round 2)
+
 - Status: READY_FOR_REVIEW
 - Branch verified: `feature/RSA-1-ingestion-pipeline`
 - Verified reviewer change requests (items 1-9):
@@ -246,6 +253,7 @@ Criteria 1-4, 7, 8, 9, 10, 11, 12, 13, 14, and 15 are satisfied in code review. 
 ## Fix Round 2 Summary
 
 ### Addressed Items
+
 1. **Unconfigured vector store in production**: Added `UnconfiguredVectorStore` in `backend/app/vectorstore.py` that raises `ConfigurationError` on chunk insertion or retrieval when `RAG_PGVECTOR_DSN` is unset. Updated `backend/app/dependencies.py` to use `UnconfiguredVectorStore` by default instead of `FakeVectorStore()`. Added optional `vectorstore` parameter to `create_app` in `backend/app/main.py` and passed `vectorstore=vectorstore` in test `fake_container` fixture. Added test `test_pipeline_fails_when_vectorstore_unconfigured` asserting pipeline never reaches `completed` and fails at `database_ready` stage when DSN is unset.
 2. **Batching for embedding APIs**: Added batching for `CloudflareEmbeddingProvider.embed` (batch size 100, `CLOUDFLARE_MAX_BATCH_SIZE`) and `OpenAIEmbeddingProvider.embed` (batch size 2048, `OPENAI_MAX_BATCH_SIZE`). Added tests `test_cloudflare_embedding_provider_batching_and_order` and `test_openai_embedding_provider_batching_and_order` monkeypatching `httpx.AsyncClient.post` asserting batch counts/sizes and exact vector output order.
 3. **Fixed error message for Cloudflare response format**: Changed exception in `CloudflareEmbeddingProvider.embed` to a fixed message `ValueError("Unexpected Cloudflare embedding response format")` without interpolating the response body.
@@ -253,6 +261,7 @@ Criteria 1-4, 7, 8, 9, 10, 11, 12, 13, 14, and 15 are satisfied in code review. 
 5. **Transient error polling in UI**: Updated `fetchPipeline` in `frontend/src/components/IngestionPipelineView.tsx` to clear transient error on success and reschedule polling after catch, ensuring polling only stops on `completed` or `failed`.
 
 ### Test Verification
+
 - Targeted Ingestion Suite: `cd backend && python -m pytest tests/test_ingestion.py -v` (22 passed, 1 skipped).
 - Full Backend Suite: `cd backend && python -m pytest -q -p no:warnings` (60 passed, 1 skipped in 3.35s).
 - Frontend Build: `cd frontend && npm run build` (Clean build in 2.27s, `tsconfig.app.tsbuildinfo` reverted).
@@ -260,6 +269,7 @@ Criteria 1-4, 7, 8, 9, 10, 11, 12, 13, 14, and 15 are satisfied in code review. 
 @tester: use Gemini 3.8 Flash (copilot). Verify the fix round against the reviewer's change requests and run the test gate. Do not commit or push.
 
 ### Tester Verdict (Round 3)
+
 - Status: READY_FOR_REVIEW
 - Branch verified: `feature/RSA-1-ingestion-pipeline`
 - Verified reviewer change requests (Round 2 items 1-5):
@@ -309,6 +319,7 @@ Criteria 1-15 remain satisfied in code review. Item 1 is a security finding unde
 ## Fix Round 3 Summary
 
 ### Addressed Items
+
 1. **Bounded zlib decompression in PDF fallback (DoS defense)**:
    - Added `MAX_STREAM_DECOMPRESSED_BYTES = 2 * 1024 * 1024` (2 MB) and `MAX_TOTAL_DECOMPRESSED_BYTES = 8 * 1024 * 1024` (8 MB) in `backend/app/ingestion.py`.
    - Replaced unbounded `zlib.decompress` calls with bounded decompression using `zlib.decompressobj(wbits).decompress(stream_data, stream_limit + 1)`.
@@ -324,6 +335,7 @@ Criteria 1-15 remain satisfied in code review. Item 1 is a security finding unde
    - Added `test_pipeline_pdf_decompression_limit_fails` verifying pipeline marks `file_parsing` as `failed`, sets error to `"PDF content exceeds decompression limit"`, and keeps subsequent stages idle.
 
 ### Test Verification
+
 - Targeted Ingestion Suite: `cd backend && python -m pytest tests/test_ingestion.py -v` (25 passed, 1 skipped in 2.22s).
 - Full Backend Suite: `cd backend && python -m pytest -q -p no:warnings` (63 passed, 1 skipped in 3.49s).
 - Frontend Build: `cd frontend && npm run build` (Clean build in 2.29s).
@@ -332,6 +344,7 @@ Criteria 1-15 remain satisfied in code review. Item 1 is a security finding unde
 @tester: use Gemini 3.8 Flash (copilot). Verify the fix round against the reviewer's change requests and run the test gate. Do not commit or push.
 
 ### Tester Verdict (Round 4)
+
 - Status: READY_FOR_REVIEW
 - Branch verified: `feature/RSA-1-ingestion-pipeline`
 - Verified reviewer change requests (Round 3 item 1 & cleanup):
@@ -351,6 +364,7 @@ Criteria 1-15 remain satisfied in code review. Item 1 is a security finding unde
 Reviewer: Claude Haiku 5.5 (copilot). Branch verified: `feature/RSA-1-ingestion-pipeline`. Worktree holds only task changes plus the pre-existing untracked `.agents/` and `skills-lock.json`. Verdict: DONE.
 
 Evidence reviewed:
+
 - Round 3 item 1 is confirmed in code: per-stream cap (2 MB) and cumulative cap (8 MB) via `zlib.decompressobj`, fixed message `PDF content exceeds decompression limit`, and the pypdf path unchanged.
 - Reviewer probe with a 200 MB single-stream bomb: fails with the fixed message, peak traced memory 4.6 MB (previously about 449 MB). Five-stream input over the cumulative cap fails with the same message.
 - Unused `FakeVectorStore` import removed from `backend/app/dependencies.py`.
@@ -359,10 +373,10 @@ Evidence reviewed:
 Acceptance status: criteria 1-15 satisfied.
 
 Non-blocking notes carried forward (no change required for this ticket):
+
 - The Cloudflare batch size of 100 is still unverified against provider docs. Verify before merge or cite the source in a code comment.
 - `copyPayload` in `IngestionPipelineView.tsx` does not clear its timer on unmount, and polling continues after a 404.
 - `RAG_PGVECTOR_DSN` in `docker-compose.yml` does not URL-encode `POSTGRES_PASSWORD`.
 - The pypdf path has no decompression limit of its own (kept unchanged per the round 3 request).
 
 Fix rounds used: 3 / 3. No `BLOCKED` escalation needed.
-

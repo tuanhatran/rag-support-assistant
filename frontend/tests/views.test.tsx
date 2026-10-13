@@ -310,11 +310,9 @@ describe('chat and document workflows', () => {
     expect(await screen.findByRole('heading', { name: 'VPN help' })).toBeInTheDocument()
     await user().type(screen.getByRole('textbox', { name: 'Your question' }), 'How do I reconnect?')
     await user().click(screen.getByRole('button', { name: 'Send question' }))
-    await waitFor(() => expect(chatApi.sendMessage).toHaveBeenCalledWith(
-      session.id,
-      'How do I reconnect?',
-      expect.any(Function),
-    ))
+    await waitFor(() =>
+      expect(chatApi.sendMessage).toHaveBeenCalledWith(session.id, 'How do I reconnect?', expect.any(Function)),
+    )
     await user().click(screen.getAllByRole('button', { name: 'Helpful' })[1])
     expect(await screen.findByText('Thanks for rating this answer.')).toBeInTheDocument()
     await user().click(screen.getAllByRole('button', { name: 'Not helpful' })[1])

@@ -8,7 +8,8 @@ export const deleteSession = (sessionId: string) => api.delete(`/chat/sessions/$
 const streamError = 'The configured model could not answer this request. Please try again or open a support ticket.'
 const safeMetadataPattern = /^[A-Za-z0-9._:-]{1,128}$/
 const safeProviders = new Set(['mock', 'openai', 'azure_openai', 'anthropic'])
-const credentialLikeModelPattern = /(?:^|[^a-z0-9])(?:sk|pk|rk)[_-][a-z0-9_-]{8,}|(?:^|[^a-z0-9])(?:api[_-]?key|bearer|token)[_-][a-z0-9_-]{8,}/i
+const credentialLikeModelPattern =
+  /(?:^|[^a-z0-9])(?:sk|pk|rk)[_-][a-z0-9_-]{8,}|(?:^|[^a-z0-9])(?:api[_-]?key|bearer|token)[_-][a-z0-9_-]{8,}/i
 
 function safeMetadata(value: unknown): string | undefined {
   return typeof value === 'string' && safeMetadataPattern.test(value) ? value : undefined
@@ -73,9 +74,12 @@ export async function sendMessage(
     status = response.status
     requestId = safeMetadata(response.headers.get('X-Request-ID'))
     if (!response.headers.get('content-type')?.includes('text/event-stream')) {
-      const message = await response.json() as Message
+      const message = (await response.json()) as Message
       logSendMessage('complete', startedAt, {
-        requestId, status, provider: message.model?.provider, model: message.model?.model,
+        requestId,
+        status,
+        provider: message.model?.provider,
+        model: message.model?.model,
       })
       return message
     }
@@ -145,7 +149,10 @@ export async function sendMessage(
     const result = completed as Message | null
     if (!result) throw new Error(streamError)
     logSendMessage('complete', startedAt, {
-      requestId, status, provider: result.model?.provider, model: result.model?.model,
+      requestId,
+      status,
+      provider: result.model?.provider,
+      model: result.model?.model,
     })
     return result
   } catch (reason) {

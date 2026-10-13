@@ -95,11 +95,7 @@ export function ConnectionDialog({ form, editing, connections, busy, error, onCh
                 checked={localLlm}
                 onChange={(event) => {
                   onChange({
-                    base_url: event.target.checked
-                      ? localLlm
-                        ? form.base_url
-                        : 'http://localhost:11434/v1'
-                      : '',
+                    base_url: event.target.checked ? (localLlm ? form.base_url : 'http://localhost:11434/v1') : '',
                   })
                 }}
               />

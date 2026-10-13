@@ -14,7 +14,11 @@ import { PolicyModal } from './PolicyModal'
 export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void }) {
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [active, setActive] = useState<ChatSession | null>(null)
-  const [streamingAnswer, setStreamingAnswer] = useState<{ sessionId: string; question: string; answer: string } | null>(null)
+  const [streamingAnswer, setStreamingAnswer] = useState<{
+    sessionId: string
+    question: string
+    answer: string
+  } | null>(null)
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)

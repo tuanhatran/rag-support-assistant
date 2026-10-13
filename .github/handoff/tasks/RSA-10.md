@@ -9,11 +9,11 @@ Use `CHANGES_REQUESTED` for review findings, `BLOCKED` for unresolved decisions,
 
 ## Model Routing
 
-| Complexity | Coder | Tester | Reviewer |
-| --- | --- | --- | --- |
-| S | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| M | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| L | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| Complexity | Coder      | Tester     | Reviewer   |
+| ---------- | ---------- | ---------- | ---------- |
+| S          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| M          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| L          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
 
 Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
 
@@ -266,6 +266,7 @@ Status: READY_FOR_TEST
 - Status: `READY_FOR_TEST`.
 
 @tester: verify provider allowlisting and credential-like model-label rejection. Use GPT-6 Luna.
+
 - User reports: `RSA-10 manual test succesful, ticket can be close`. Recorded as user-reported success; not treated as orchestrator confirmation to close.
 - Closure gate: Orchestrator, did requirements change since this handoff? Do not set `DONE` until you explicitly confirm. After the privacy finding is fixed and reviewed, leave `READY_FOR_REVIEW` pending that answer; record requirement changes and use `USER_CHANGES_REQUESTED` if the answer is yes.
 

@@ -4,11 +4,11 @@ Status: READY_FOR_REVIEW
 
 ## Model Routing
 
-| Complexity | Coder | Tester | Reviewer |
-| --- | --- | --- | --- |
-| S | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| M | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| L | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| Complexity | Coder      | Tester     | Reviewer   |
+| ---------- | ---------- | ---------- | ---------- |
+| S          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| M          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| L          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
 
 Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
 

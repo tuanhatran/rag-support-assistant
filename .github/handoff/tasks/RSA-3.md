@@ -4,11 +4,11 @@ Status: DONE
 
 ## Model Routing
 
-| Complexity | Coder | Tester | Reviewer |
-| --- | --- | --- | --- |
-| S | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| M | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| L | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| Complexity | Coder      | Tester     | Reviewer   |
+| ---------- | ---------- | ---------- | ---------- |
+| S          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| M          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| L          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
 
 Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
 
@@ -19,13 +19,13 @@ Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
 - Complexity: S
 - Context files: `.github/context/FILE_GRAPH.md`, `readme.md`, `frontend/package.json`, `frontend/cypress.config.ts`, `frontend/cypress/e2e/admin.cy.ts`, `frontend/cypress/support/helpers.ts`, `frontend/cypress/support/commands.ts`, `frontend/src/components/AdminView.tsx`
 - Acceptance criteria:
--  - Run the Admin spec against the real local app/backend and report whether setup and Admin navigation complete. If setup fails, identify the first failing `beforeEach` stage among `registerUser`, `seedConversation`/feedback submission, `adminLogin` (including consent), and `visit`/Admin navigation; report only safe status/response metadata.
--  - Make a Cypress spec/support/config-only setup change only if the observed evidence demonstrates a test setup defect. Do not change backend production behavior to conceal or compensate for an unverified Cypress failure.
--  - Exercise real local app/backend requests. Do not stub, mock, suppress, or bypass setup or application behavior with Cypress intercepts; retain existing behavioral assertions that still send requests to the real app.
--  - Once setup succeeds, the confirmation and cancellation cases execute (not pending or skipped) and pass: confirmation persists the selected plan, cancellation submits no update and leaves the saved plan unchanged.
--  - The confirmation button appears at the end of the plan-change row, after the change dropdown, rather than below the dropdown.
--  - If a real app/backend failure is reproduced, record sanitized evidence and the exact failing stage; do not claim the confirmation/cancellation acceptance cases passed unless they ran.
--  - Preserve the existing confirmation UI behavior, success/error handling, and all unrelated staged/unstaged worktree changes.
+- - Run the Admin spec against the real local app/backend and report whether setup and Admin navigation complete. If setup fails, identify the first failing `beforeEach` stage among `registerUser`, `seedConversation`/feedback submission, `adminLogin` (including consent), and `visit`/Admin navigation; report only safe status/response metadata.
+- - Make a Cypress spec/support/config-only setup change only if the observed evidence demonstrates a test setup defect. Do not change backend production behavior to conceal or compensate for an unverified Cypress failure.
+- - Exercise real local app/backend requests. Do not stub, mock, suppress, or bypass setup or application behavior with Cypress intercepts; retain existing behavioral assertions that still send requests to the real app.
+- - Once setup succeeds, the confirmation and cancellation cases execute (not pending or skipped) and pass: confirmation persists the selected plan, cancellation submits no update and leaves the saved plan unchanged.
+- - The confirmation button appears at the end of the plan-change row, after the change dropdown, rather than below the dropdown.
+- - If a real app/backend failure is reproduced, record sanitized evidence and the exact failing stage; do not claim the confirmation/cancellation acceptance cases passed unless they ran.
+- - Preserve the existing confirmation UI behavior, success/error handling, and all unrelated staged/unstaged worktree changes.
 - Test commands: `cd frontend && npm run e2e -- --spec cypress/e2e/admin.cy.ts`; `cd frontend && npm run build` if Cypress files/config change
 
 ## Tester Retest (2026-10-10)
