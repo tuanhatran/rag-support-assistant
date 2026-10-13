@@ -1,8 +1,10 @@
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  requestId?: string
+  constructor(status: number, message: string, requestId?: string) {
     super(message)
     this.status = status
+    this.requestId = requestId
   }
 }
 
@@ -12,15 +14,24 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler
 }
 
-export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function requestResponse(path: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers)
   if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   const response = await fetch(`/api${path}`, { ...options, headers, credentials: 'same-origin' })
   if (response.status === 401) unauthorizedHandler?.()
   if (!response.ok) {
     const payload = await response.json().catch(() => null)
-    throw new ApiError(response.status, payload?.detail ?? payload?.error ?? `Request failed (${response.status})`)
+    throw new ApiError(
+      response.status,
+      payload?.detail ?? payload?.error ?? `Request failed (${response.status})`,
+      response.headers.get('X-Request-ID') ?? undefined,
+    )
   }
+  return response
+}
+
+export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await requestResponse(path, options)
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }

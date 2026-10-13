@@ -14,6 +14,7 @@ import { PolicyModal } from './PolicyModal'
 export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void }) {
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [active, setActive] = useState<ChatSession | null>(null)
+  const [streamingAnswer, setStreamingAnswer] = useState<{ sessionId: string; question: string; answer: string } | null>(null)
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -80,6 +81,7 @@ export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void 
     if (!value || sending) return
     setQuestion('')
     setError('')
+    setStreamingAnswer(null)
     setSending(true)
     try {
       let session = active
@@ -88,16 +90,20 @@ export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void 
         session = { ...session, messages: [] }
         setActive(session)
       }
-      const message = await chatApi.sendMessage(session.id, value)
+      const message = await chatApi.sendMessage(session.id, value, (answer) => {
+        setStreamingAnswer({ sessionId: session!.id, question: value, answer })
+      })
       const updated = {
         ...session,
         title: session.messages?.length ? session.title : value.slice(0, 60),
         messages: [...(session.messages ?? []), message],
       }
       setActive(updated)
+      setStreamingAnswer(null)
       setSessions((current) => [updated, ...current.filter((item) => item.id !== session!.id)])
       inputRef.current?.focus()
     } catch (reason) {
+      setStreamingAnswer(null)
       setError(reason instanceof Error ? reason.message : 'The answer could not be generated.')
       setQuestion(value)
     } finally {
@@ -164,6 +170,7 @@ export function ChatView({ onBrowseDocuments }: { onBrowseDocuments: () => void 
         <ChatTranscript
           active={active}
           sending={sending}
+          streamingAnswer={streamingAnswer && active?.id === streamingAnswer.sessionId ? streamingAnswer : null}
           endRef={endRef}
           onSendSuggestion={(question) => void send(question)}
           onBrowseDocuments={onBrowseDocuments}

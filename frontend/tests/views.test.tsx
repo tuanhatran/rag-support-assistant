@@ -275,6 +275,32 @@ describe('authentication and application shell', () => {
 })
 
 describe('chat and document workflows', () => {
+  it('renders streamed answer chunks before final response completes', async () => {
+    vi.mocked(chatApi.listSessions).mockResolvedValue([session])
+    vi.mocked(chatApi.getSession).mockResolvedValue(session)
+    let finishStream!: () => void
+    const streamGate = new Promise<void>((resolve) => {
+      finishStream = resolve
+    })
+    vi.mocked(chatApi.sendMessage).mockImplementation(async (_sessionId, question, onChunk) => {
+      onChunk?.('First chunk arrives')
+      await streamGate
+      onChunk?.('Complete streamed answer')
+      return { ...sentMessage, question, answer: 'Final persisted answer' }
+    })
+
+    render(<ChatView onBrowseDocuments={vi.fn()} />)
+    await screen.findByRole('heading', { name: 'VPN help' })
+    await user().type(screen.getByRole('textbox', { name: 'Your question' }), 'How do I reconnect?')
+    await user().click(screen.getByRole('button', { name: 'Send question' }))
+
+    expect(await screen.findByText('First chunk arrives')).toBeInTheDocument()
+    expect(screen.queryByText('Final persisted answer')).not.toBeInTheDocument()
+    finishStream()
+    expect(await screen.findByText('Final persisted answer')).toBeInTheDocument()
+    expect(screen.queryByText('First chunk arrives')).not.toBeInTheDocument()
+  })
+
   it('loads a conversation, sends question, rates answer, opens source and deletes session', async () => {
     vi.mocked(chatApi.listSessions).mockResolvedValue([session])
     vi.mocked(chatApi.getSession).mockResolvedValue(session)
@@ -284,7 +310,11 @@ describe('chat and document workflows', () => {
     expect(await screen.findByRole('heading', { name: 'VPN help' })).toBeInTheDocument()
     await user().type(screen.getByRole('textbox', { name: 'Your question' }), 'How do I reconnect?')
     await user().click(screen.getByRole('button', { name: 'Send question' }))
-    await waitFor(() => expect(chatApi.sendMessage).toHaveBeenCalledWith(session.id, 'How do I reconnect?'))
+    await waitFor(() => expect(chatApi.sendMessage).toHaveBeenCalledWith(
+      session.id,
+      'How do I reconnect?',
+      expect.any(Function),
+    ))
     await user().click(screen.getAllByRole('button', { name: 'Helpful' })[1])
     expect(await screen.findByText('Thanks for rating this answer.')).toBeInTheDocument()
     await user().click(screen.getAllByRole('button', { name: 'Not helpful' })[1])

@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from app.config import Settings
-from app.llm import complete, is_keyless_ollama, mock_answer
+from app.llm import complete, is_keyless_ollama, mock_answer, stream_complete
 from app.rag import KnowledgeBase, tokenize
 from app.redaction import redact
 from app.schemas import ConnectionRequest
@@ -135,6 +135,40 @@ async def test_openai_client_uses_compatible_url_and_bearer_header():
     assert observed["url"] == "https://llm.example/v1/chat/completions"
     assert observed["authorization"] == "Bearer private-test-key"
     assert b"test-model" in observed["body"]
+
+
+@pytest.mark.asyncio
+async def test_upstream_http_error_is_logged_without_response_body(caplog):
+    async def handler(request: httpx.Request):
+        return httpx.Response(400, text="model not found; api_key=sk-abcdefghijklmnopqrstuvwxyz1234567890")
+
+    with pytest.raises(RuntimeError, match="provider returned HTTP 400"):
+        await complete({"provider": "openai", "model": "test-model", "base_url": "http://localhost:11434/v1"},
+                       "", [{"role": "user", "content": "hello"}], 3,
+                       transport=httpx.MockTransport(handler))
+
+    error = next(record for record in caplog.records if record.name == "app.llm" and record.levelname == "ERROR")
+    assert error.getMessage() == "LLM upstream returned error response"
+    assert error.fields == {"provider": "openai", "status_code": 400,
+                            "upstream_error": "model not found; api_key=[REDACTED]"}
+    assert "sk-abcdefghijklmnopqrstuvwxyz1234567890" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_stream_upstream_http_error_is_logged_without_response_body(caplog):
+    async def handler(request: httpx.Request):
+        return httpx.Response(400, text="model not found; api_key=sk-abcdefghijklmnopqrstuvwxyz1234567890")
+
+    connection = {"provider": "openai", "model": "test-model", "base_url": "http://localhost:11434/v1"}
+    with pytest.raises(RuntimeError, match="provider returned HTTP 400"):
+        async for _ in stream_complete(connection, "", [], 3, transport=httpx.MockTransport(handler)):
+            pass
+
+    error = next(record for record in caplog.records if record.name == "app.llm" and record.levelname == "ERROR")
+    assert error.getMessage() == "LLM upstream returned error response"
+    assert error.fields == {"provider": "openai", "status_code": 400,
+                            "upstream_error": "model not found; api_key=[REDACTED]"}
+    assert "sk-abcdefghijklmnopqrstuvwxyz1234567890" not in caplog.text
 
 
 @pytest.mark.asyncio

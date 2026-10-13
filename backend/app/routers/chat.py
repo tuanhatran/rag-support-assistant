@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import json
+
+from fastapi.encoders import jsonable_encoder
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 
 from app.dependencies import consented_user, current_user
 from app.errors import NotFoundError
+from app.llm import is_keyless_ollama
+from app.observability import request_context
 from app.schemas import MessageRequest
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -46,4 +52,21 @@ async def delete_session(request: Request, session_id: str, user=Depends(current
 
 @router.post("/sessions/{session_id}/messages")
 async def send_message(request: Request, session_id: str, body: MessageRequest, user=Depends(consented_user)):
-    return await request.app.state.container.chat.ask(user, session_id, body.question)
+    container = request.app.state.container
+    connection = await container.auth.connection_for_plan(user["plan"])
+    if not is_keyless_ollama(connection):
+        return await container.chat.ask(user, session_id, body.question, connection)
+    stream = await container.chat.ask_streaming(user, session_id, body.question, connection)
+    context = request_context.get()
+
+    async def events():
+        token = request_context.set(context)
+        try:
+            async for event, payload in stream:
+                encoded = json.dumps(jsonable_encoder(payload), separators=(",", ":"))
+                yield f"event: {event}\ndata: {encoded}\n\n"
+        finally:
+            request_context.reset(token)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

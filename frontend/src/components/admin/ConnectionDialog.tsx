@@ -16,6 +16,7 @@ type Props = {
 
 export function ConnectionDialog({ form, editing, connections, busy, error, onChange, onClose, onSubmit }: Props) {
   const editingConnection = connections.find((item) => item.id === editing)
+  const localLlm = form.provider === 'openai' && isLocalOllamaUrl(form.base_url)
 
   return (
     <div
@@ -87,6 +88,24 @@ export function ConnectionDialog({ form, editing, connections, busy, error, onCh
               />
             </label>
           )}
+          {form.provider === 'openai' && (
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={localLlm}
+                onChange={(event) => {
+                  onChange({
+                    base_url: event.target.checked
+                      ? localLlm
+                        ? form.base_url
+                        : 'http://localhost:11434/v1'
+                      : '',
+                  })
+                }}
+              />
+              <span>Local LLM</span>
+            </label>
+          )}
           {(form.provider === 'azure_openai' || form.provider === 'anthropic') && (
             <label className="field-label">
               API version
@@ -103,6 +122,7 @@ export function ConnectionDialog({ form, editing, connections, busy, error, onCh
                 API key
                 <input
                   type="password"
+                  required={!localLlm}
                   value={form.api_key}
                   onChange={(event) => onChange({ api_key: event.target.value, remove_api_key: false })}
                   placeholder={
@@ -186,6 +206,24 @@ export function ConnectionDialog({ form, editing, connections, busy, error, onCh
       </form>
     </div>
   )
+}
+
+function isLocalOllamaUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1', '[::1]', 'host.docker.internal'].includes(url.hostname.toLowerCase()) &&
+      url.port === '11434' &&
+      url.pathname.replace(/\/+$/, '') === '/v1' &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash
+    )
+  } catch {
+    return false
+  }
 }
 
 function providerHelp(provider: ConnectionForm['provider']) {
