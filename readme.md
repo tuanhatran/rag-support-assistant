@@ -52,7 +52,7 @@ Docker Compose starts MongoDB, PostgreSQL with pgvector, the backend, and fronte
 
 ### Use local Ollama
 
-Install Ollama and download the model with `ollama pull deepseek-r1:14b`. In **Admin → Connections**, add an `OpenAI-compatible` connection, select **Local LLM**, enter model `deepseek-r1:14b`, and assign it to the desired plans. This selects the local Ollama endpoint and makes the API key optional. When the backend runs directly on your computer, use `http://localhost:11434/v1` as the base URL. Keyless access is limited to recognized local Ollama endpoints; remote OpenAI-compatible endpoints still require an API key.
+Install Ollama and download the model with `ollama pull deepseek-r1:14b`. Before testing Chat, start Ollama with the model using `ollama run deepseek-r1:14b` and leave it running. In **Admin → Connections**, add an `OpenAI-compatible` connection, select **Local LLM**, enter model `deepseek-r1:14b`, and assign it to the desired plans. This selects the local Ollama endpoint and makes the API key optional. When the backend runs directly on your computer, use `http://localhost:11434/v1` as the base URL. Keyless access is limited to recognized local Ollama endpoints; remote OpenAI-compatible endpoints still require an API key.
 
 When the backend runs in Docker, use `http://host.docker.internal:11434/v1` so the container can reach Ollama on the host. On Linux, make sure the backend container can resolve `host.docker.internal` (for example, map it to `host-gateway` in Compose). Ollama must listen on an interface reachable from Docker; restrict that access to trusted local networks. Test the connection from the admin page before assigning plans.
 

@@ -1,7 +1,7 @@
 ---
 name: coder
 description: Implement the active Fieldnote handoff task and keep tests and file graph aligned.
-model: GPT-6 Luna
+model: Claude Haiku 5.5
 tools:
   - read
   - search

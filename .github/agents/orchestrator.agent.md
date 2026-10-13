@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: Run the full planner, coder, tester, reviewer workflow automatically for one ticket (task ID plus description).
-model: GPT-6 Luna
+model: Claude Haiku 5.5
 agents:
   - planner
   - coder

@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Break a Fieldnote task into scoped implementation work and prepare the coder handoff.
-model: GPT-6 Luna
+model: Claude Haiku 5.5
 tools:
   - read
   - search
