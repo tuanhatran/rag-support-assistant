@@ -102,6 +102,49 @@ describe('Admin screen', () => {
       cy.get('.page-alert').should('contain', 'Connection deleted.')
       cy.contains('tr', connectionName).should('not.exist')
     })
+
+    it('creates and edits a keyless local Ollama connection', () => {
+      const localConnectionName = `${connectionName}-local`
+      cy.intercept('POST', '/api/admin/connections/*/test', {
+        statusCode: 200,
+        body: { ok: true, message: 'Connection confirmed' },
+      }).as('testLocalConnection')
+
+      cy.contains('button', 'Add connection').click()
+      cy.get('[role="dialog"]').within(() => {
+        cy.contains('label', /^Name/).find('input').type(localConnectionName)
+        cy.contains('label', /^Provider/)
+          .find('select')
+          .select('openai')
+        cy.contains('label', /^Model or deployment/)
+          .find('input')
+          .clear()
+          .type('deepseek-r1:14b')
+        cy.contains('label', 'Local LLM').find('input').check()
+        cy.contains('label', /^API key/)
+          .find('input')
+          .should('not.have.attr', 'required')
+        cy.get('.plan-checks input[type="checkbox"]').uncheck()
+        cy.contains('button', 'Save connection').click()
+      })
+      cy.get('.page-alert').should('contain', 'Connection created.')
+      cy.contains('tr', localConnectionName).should('contain', 'No key')
+
+      cy.get(`button[aria-label="Test ${localConnectionName}"]`).click()
+      cy.wait('@testLocalConnection').its('response.statusCode').should('eq', 200)
+
+      cy.get(`button[aria-label="Edit ${localConnectionName}"]`).click()
+      cy.get('[role="dialog"]').within(() => {
+        cy.contains('label', 'Local LLM').find('input').should('be.checked')
+        cy.contains('label', /^API key/)
+          .find('input')
+          .should('not.have.attr', 'required')
+        cy.contains('button', 'Save connection').click()
+      })
+      cy.get('.page-alert').should('contain', 'Connection updated.')
+      cy.get(`button[aria-label="Delete ${localConnectionName}"]`).click()
+      cy.get('.page-alert').should('contain', 'Connection deleted.')
+    })
   })
 
   describe('Users', () => {

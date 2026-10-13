@@ -2,11 +2,11 @@
 
 A RAG (Retrieval-Augmented Generation) support assistant. Chat answers IT troubleshooting questions from the bundled knowledge base and, when PostgreSQL/pgvector and a configured embedding provider are available, active ingested document chunks too. Chat includes sources and answer feedback, and falls back to the bundled knowledge base when vector retrieval is unavailable. Users sign in, and each user's plan decides which LLM answers them.
 
-| Part | Stack |
-| --- | --- |
-| Backend | Python 3.13, FastAPI, PyMongo (async), BM25 + pgvector hybrid chat retrieval |
-| Frontend | React 19, TypeScript, Vite |
-| Databases | MongoDB 7; PostgreSQL 17 with pgvector for ingestion |
+| Part      | Stack                                                                        |
+| --------- | ---------------------------------------------------------------------------- |
+| Backend   | Python 3.13, FastAPI, PyMongo (async), BM25 + pgvector hybrid chat retrieval |
+| Frontend  | React 19, TypeScript, Vite                                                   |
+| Databases | MongoDB 7; PostgreSQL 17 with pgvector for ingestion                         |
 
 ## Features
 
@@ -21,21 +21,21 @@ A RAG (Retrieval-Augmented Generation) support assistant. Chat answers IT troubl
   - `openai`: OpenAI or any OpenAI-compatible API (ollama `http://localhost:11434/v1`, Mistral, vLLM, LM Studio...).
   - `azure_openai`: Azure OpenAI (model = deployment name, API version required).
   - `anthropic`: Anthropic Messages API.
-- **Feedback**: rate each answer as *Helpful* or *Not helpful* (with reasons and a comment). Admins can review feedback with satisfaction stats.
+- **Feedback**: rate each answer as _Helpful_ or _Not helpful_ (with reasons and a comment). Admins can review feedback with satisfaction stats.
 - **Logs and audit trail**: structured JSON logs with a request ID on every line, plus a MongoDB audit trail of security and admin events that admins can search.
 - **Data policy**: a versioned policy users must accept, data notices next to the chat and feedback, automatic redaction of secrets, retention limits, and self-service export and erasure.
 
 ## MongoDB collections
 
-| Collection | Content |
-| --- | --- |
-| `users` | Username (unique, lowercase), role, plan, `policy_consent` (version and date accepted), and `password` = `{algorithm: scrypt, n, r, p, salt, hash}` with a random 16-byte salt per user |
-| `auth_sessions` | Login sessions keyed by the SHA-256 of the cookie token, purged by a TTL index on `expires_at` |
-| `chat_sessions` | One document per conversation, owned by `user_id`; `messages[]` holds the redacted question and answer, sources, model used, latency, and status. `expires_at` moves forward with each message |
-| `chat_feedback` | One document per rated answer (unique on `session_id` + `message_id`), with the user and a redacted snapshot of the question, answer, and comment |
-| `llm_connections` | LLM connection settings and the `plans` each one serves. API keys are stored encrypted (`api_key_encrypted`) |
-| `audit_logs` | Security and admin events: event, outcome, actor, target, details, request ID, IP address, user agent |
-| `ingestion_pipelines` | Uploaded file metadata, processing options and stage status, extracted text, errors, and expiry |
+| Collection            | Content                                                                                                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`               | Username (unique, lowercase), role, plan, `policy_consent` (version and date accepted), and `password` = `{algorithm: scrypt, n, r, p, salt, hash}` with a random 16-byte salt per user        |
+| `auth_sessions`       | Login sessions keyed by the SHA-256 of the cookie token, purged by a TTL index on `expires_at`                                                                                                 |
+| `chat_sessions`       | One document per conversation, owned by `user_id`; `messages[]` holds the redacted question and answer, sources, model used, latency, and status. `expires_at` moves forward with each message |
+| `chat_feedback`       | One document per rated answer (unique on `session_id` + `message_id`), with the user and a redacted snapshot of the question, answer, and comment                                              |
+| `llm_connections`     | LLM connection settings and the `plans` each one serves. API keys are stored encrypted (`api_key_encrypted`)                                                                                   |
+| `audit_logs`          | Security and admin events: event, outcome, actor, target, details, request ID, IP address, user agent                                                                                          |
+| `ingestion_pipelines` | Uploaded file metadata, processing options and stage status, extracted text, errors, and expiry                                                                                                |
 
 MongoDB collections with expiring data have an `expires_at` field and a TTL index (`expireAfterSeconds: 0`), so MongoDB deletes expired documents automatically. Ingested chunks and embeddings live in PostgreSQL's `document_chunks` table and are removed by the backend's hourly expiry sweep.
 
@@ -52,7 +52,7 @@ Docker Compose starts MongoDB, PostgreSQL with pgvector, the backend, and fronte
 
 ### Use local Ollama
 
-Install Ollama and download the model with `ollama pull deepseek-r1:14b`. In **Admin → Connections**, add an `openai` connection with model `deepseek-r1:14b`, no API key, and assign it to the desired plans. When the backend runs directly on your computer, use `http://localhost:11434/v1` as the base URL.
+Install Ollama and download the model with `ollama pull deepseek-r1:14b`. In **Admin → Connections**, add an `OpenAI-compatible` connection, select **Local LLM**, enter model `deepseek-r1:14b`, and assign it to the desired plans. This selects the local Ollama endpoint and makes the API key optional. When the backend runs directly on your computer, use `http://localhost:11434/v1` as the base URL. Keyless access is limited to recognized local Ollama endpoints; remote OpenAI-compatible endpoints still require an API key.
 
 When the backend runs in Docker, use `http://host.docker.internal:11434/v1` so the container can reach Ollama on the host. On Linux, make sure the backend container can resolve `host.docker.internal` (for example, map it to `host-gateway` in Compose). Ollama must listen on an interface reachable from Docker; restrict that access to trusted local networks. Test the connection from the admin page before assigning plans.
 
@@ -124,18 +124,18 @@ Set `CYPRESS_BASE_URL` to test another origin, for example `http://localhost:517
 
 Five custom agents in `.github/agents/` split each task into planner, coder, tester, and reviewer stages, with an orchestrator to coordinate them. Each task (ticket) has its own handoff file `.github/handoff/tasks/<TASK-ID>.md`, for example `PROJ-123.md`, created by the planner from [.github/handoff/TEMPLATE.md](.github/handoff/TEMPLATE.md). The handoff carries shared state, so stages can run in fresh chat sessions and multiple tasks can be in flight. Each task uses one branch shared by all stages; the branch is recorded in the handoff and reused on resume. Agents preserve existing staged and unstaged changes, attempt branch operations non-destructively, and do not commit or push.
 
-| Agent | Acts when Status is | Can edit | Sets Status to |
-| --- | --- | --- | --- |
-| `planner` | task file is new, or `BLOCKED` | Task handoff file only | `READY_FOR_CODE` |
-| `coder` | `READY_FOR_CODE`, `CHANGES_REQUESTED` | Application code and tests | `READY_FOR_TEST` or `BLOCKED` |
-| `tester` | `READY_FOR_TEST` | Tests and the task handoff file | `READY_FOR_REVIEW` or `CHANGES_REQUESTED` |
-| `reviewer` | `READY_FOR_REVIEW` | Task handoff file only | `DONE` or `CHANGES_REQUESTED` |
+| Agent      | Acts when Status is                   | Can edit                        | Sets Status to                            |
+| ---------- | ------------------------------------- | ------------------------------- | ----------------------------------------- |
+| `planner`  | task file is new, or `BLOCKED`        | Task handoff file only          | `READY_FOR_CODE`                          |
+| `coder`    | `READY_FOR_CODE`, `CHANGES_REQUESTED` | Application code and tests      | `READY_FOR_TEST` or `BLOCKED`             |
+| `tester`   | `READY_FOR_TEST`                      | Tests and the task handoff file | `READY_FOR_REVIEW` or `CHANGES_REQUESTED` |
+| `reviewer` | `READY_FOR_REVIEW`                    | Task handoff file only          | `DONE` or `CHANGES_REQUESTED`             |
 
 Pick `orchestrator` in the agent dropdown and give the ticket, for example `PROJ-123: add a password strength meter`, to run planner, coder, tester, and reviewer automatically until `DONE` or `BLOCKED`. Running it again with an existing ID resumes that task from its current status. To run stages by hand instead, pick `planner` and give the ID and description, then each next agent with the same ID. After 3 fix rounds the task goes to `BLOCKED` and back to the planner. Finished task files stay in `.github/handoff/tasks/` as the record. Shared project rules for all agents live in [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
 **Models.** The planner and reviewer use Claude Sonnet 5.5; the coder and tester use Gemini 3.8 Flash. Each task file carries the routing table copied from the template.
 
-**Code context.** The planner lists task-specific *Context files* in each handoff. Agents use CodeGraph MCP for codebase structure and dependency exploration instead of maintaining a separate file graph.
+**Code context.** The planner lists task-specific _Context files_ in each handoff. Agents use CodeGraph MCP for codebase structure and dependency exploration instead of maintaining a separate file graph.
 
 ## Logs and audit trail
 
@@ -143,13 +143,13 @@ Pick `orchestrator` in the agent dropdown and give the ticket, for example `PROJ
 - **Request IDs**: the backend reuses a valid incoming `X-Request-ID` header or generates one, and returns it on every response. Unhandled errors return a generic message with the `request_id`, so a user-reported error can be matched to the logs.
 - **Audit trail** (`audit_logs`, also written to the `app.audit` log):
 
-| Event | When |
-| --- | --- |
-| `auth.register`, `auth.login`, `auth.logout` | Account creation and sign-in/out, including failed sign-ins with the attempted username |
-| `auth.access_denied` | A non-admin calls an admin endpoint |
-| `admin.connection.created` / `updated` / `deleted` / `tested` | LLM connection changes. Field names only, never API key values |
-| `admin.user.updated` | Role or plan changes, with before and after values |
-| `privacy.policy_accepted`, `privacy.data_exported`, `privacy.data_erased`, `privacy.account_deleted` | Data policy and data-rights actions |
+| Event                                                                                                | When                                                                                    |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `auth.register`, `auth.login`, `auth.logout`                                                         | Account creation and sign-in/out, including failed sign-ins with the attempted username |
+| `auth.access_denied`                                                                                 | A non-admin calls an admin endpoint                                                     |
+| `admin.connection.created` / `updated` / `deleted` / `tested`                                        | LLM connection changes. Field names only, never API key values                          |
+| `admin.user.updated`                                                                                 | Role or plan changes, with before and after values                                      |
+| `privacy.policy_accepted`, `privacy.data_exported`, `privacy.data_erased`, `privacy.account_deleted` | Data policy and data-rights actions                                                     |
 
 Admins can filter the trail by category, outcome, and username under **Admin → Audit log**, or with `GET /api/admin/audit`.
 

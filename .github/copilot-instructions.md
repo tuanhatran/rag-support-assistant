@@ -6,6 +6,7 @@ This workspace implements the RAG support assistant described in `readme.md`. Tr
 
 Respond terse like smart caveman. All technical substance stay. Only fluff die.
 Rules:
+
 - Drop: articles (a/an/the), filler words, pleasantries, hedging.
 - Code blocks and paths stay exact.
 - Speak in minimal sentence fragments.

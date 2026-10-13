@@ -14,6 +14,7 @@ const suggestions = [
 interface ChatTranscriptProps {
   active: ChatSession | null
   sending: boolean
+  streamingAnswer: { question: string; answer: string } | null
   endRef: RefObject<HTMLDivElement | null>
   onSendSuggestion: (question: string) => void
   onBrowseDocuments: () => void
@@ -24,6 +25,7 @@ interface ChatTranscriptProps {
 export function ChatTranscript({
   active,
   sending,
+  streamingAnswer,
   endRef,
   onSendSuggestion,
   onBrowseDocuments,
@@ -115,7 +117,28 @@ export function ChatTranscript({
           </div>
         </article>
       ))}
-      {sending && (
+      {streamingAnswer && (
+        <article className="exchange streaming-exchange">
+          <div className="question-line">
+            <span className="avatar user-avatar">Y</span>
+            <div className="question-bubble">{streamingAnswer.question}</div>
+          </div>
+          <div className="answer-line">
+            <span className="assistant-mark">
+              <BookOpen size={15} />
+            </span>
+            <div className="answer-content">
+              <div className="answer-meta">
+                <span>FIELDNOTE</span>
+                <span className="meta-dot">/</span>
+                <span>STREAMING</span>
+              </div>
+              <Markdown>{streamingAnswer.answer}</Markdown>
+            </div>
+          </div>
+        </article>
+      )}
+      {sending && !streamingAnswer && (
         <div className="thinking">
           <span className="assistant-mark">
             <Sparkles size={15} />

@@ -4,11 +4,11 @@ Status: DONE
 
 ## Model Routing
 
-| Complexity | Coder | Tester | Reviewer |
-| --- | --- | --- | --- |
-| S | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
-| M | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
-| L | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| Complexity | Coder                      | Tester                     | Reviewer                   |
+| ---------- | -------------------------- | -------------------------- | -------------------------- |
+| S          | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| M          | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| L          | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
 
 Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agent picker.
 
@@ -54,6 +54,7 @@ Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agen
 @reviewer: use Claude Haiku 5.5 (copilot). All tests passed and acceptance criteria verified on branch `feat/RSA-2-ingestion-history`. Ready for review.
 
 ### Verification Summary
+
 - Branch verified: `feat/RSA-2-ingestion-history` matches checked-out branch.
 - Targeted backend test: `cd backend && python -m pytest tests/test_ingestion.py -k test_list_pipelines_endpoint -q -p no:warnings` -> 1 passed in 0.49s.
 - Full backend suite: `cd backend && python -m pytest -q -p no:warnings` -> 64 passed, 1 skipped in 3.62s.
@@ -70,6 +71,7 @@ Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agen
   9. `.github/context/FILE_GRAPH.md` updated with route and component responsibility.
 
 ### Changed Files
+
 - `backend/app/ingestion.py`: Added `MAX_PIPELINES_LIST = 50` constant and `IngestionService.list_pipelines()` with projection `{"extracted_text": 0, "stages": 0}` returning pipeline summaries sorted newest first.
 - `backend/app/routers/ingestion.py`: Added `GET /pipelines` endpoint guarded by `require_admin` declared before `/pipelines/{pipeline_id}`.
 - `backend/tests/fakes.py`: Updated `FakeCursor.sort` to handle datetime/None comparisons safely and support list/tuple key specifications.
@@ -80,6 +82,7 @@ Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agen
 - `.github/context/FILE_GRAPH.md`: Updated `routers/ingestion.py` routes and `IngestionView.tsx` responsibility.
 
 ### Review (Claude Haiku 5.5, round 1)
+
 - Branch check: checked-out `feat/RSA-2-ingestion-history` matches handoff. Worktree holds only this task's uncommitted changes; no branch action taken.
 - Backend: `GET /pipelines` is guarded by `require_admin` and declared before `/pipelines/{pipeline_id}`. `list_pipelines()` uses an explicit field whitelist, so `extracted_text` and `stages` are excluded. Sort is `created_at` descending, capped at `MAX_PIPELINES_LIST = 50`.
 - Tests re-run: `python -m pytest -q -p no:warnings` -> 64 passed, 1 skipped. `npm run build` -> passes.

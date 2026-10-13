@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import re
 import time
 import uuid
 from datetime import timedelta
@@ -9,7 +11,7 @@ from bson import ObjectId
 
 from app.embeddings import validate_embedding_dimensions
 from app.errors import AuthenticationError, ConfigurationError, NotFoundError, ValidationError
-from app.llm import build_messages, complete, is_keyless_ollama, mock_answer
+from app.llm import build_messages, complete, is_keyless_ollama, mock_answer, stream_complete
 from app.observability import log_event
 from app.redaction import redact
 from app.repositories import utcnow
@@ -197,42 +199,114 @@ class ChatService:
             result["messages"] = session.get("messages", [])
         return result
 
-    async def ask(self, user: dict, session_id: str, question: str):
+    async def _prepare_answer(self, user: dict, session_id: str, question: str, connection: dict | None = None):
         session = await self.repos.get_chat(session_id, str(user["_id"]))
         if not session:
             raise NotFoundError("Conversation not found")
         safe_question = redact(question)
         sources = await self._hybrid_sources(safe_question)
-        connection = await AuthService(self.repos, self.settings, self.audit).connection_for_plan(user["plan"])
+        connection = connection or await AuthService(self.repos, self.settings, self.audit).connection_for_plan(user["plan"])
         history = [item for item in session.get("messages", []) if item.get("status") == "ok"][-self.settings.history_turns:]
         messages = build_messages(safe_question, sources, history)
-        message_id = str(uuid.uuid4())
-        started = time.perf_counter()
-        status = "ok"
-        if connection["provider"] == "mock":
-            answer = mock_answer(sources)
-        else:
-            try:
-                encrypted_key = connection.get("api_key_encrypted", "")
-                key = decrypt_secret(self.settings.encryption_key, encrypted_key) if encrypted_key else ""
-                answer = await complete(connection, key, messages, self.settings.llm_timeout_seconds)
-                answer = redact(answer)
-            except Exception as exc:
-                status = "error"
-                answer = f"The configured model could not answer this request ({type(exc).__name__}). Please try again or open a support ticket."
-        latency = round((time.perf_counter() - started) * 1000)
+        return {"session": session, "safe_question": safe_question, "sources": sources,
+                "connection": connection, "messages": messages, "message_id": str(uuid.uuid4()),
+                "started": time.perf_counter(), "user": user}
+
+    async def _save_answer(self, prepared: dict, answer: str, status: str = "ok"):
+        user = prepared["user"]
+        session = prepared["session"]
+        safe_question = prepared["safe_question"]
+        sources = prepared["sources"]
+        connection = prepared["connection"]
+        latency = round((time.perf_counter() - prepared["started"]) * 1000)
         stored_sources = [{key: value for key, value in source.items() if key != "text"} for source in sources]
-        message = {"id": message_id, "question": safe_question, "answer": answer, "status": status,
+        message = {"id": prepared["message_id"], "question": safe_question, "answer": answer, "status": status,
                    "sources": stored_sources, "model": {"connection_id": str(connection["_id"]), "name": connection["name"],
                    "provider": connection["provider"], "model": connection["model"]}, "latency_ms": latency,
-                   "redacted": safe_question != question, "created_at": utcnow()}
+                   "redacted": safe_question != prepared["original_question"], "created_at": utcnow()}
         title = safe_question[:60].strip() or "New conversation"
-        await self.repos.chat_sessions.update_one({"_id": session_id, "user_id": str(user["_id"])}, {"$push": {"messages": message},
+        await self.repos.chat_sessions.update_one({"_id": str(session["_id"]), "user_id": str(user["_id"])}, {"$push": {"messages": message},
             "$set": {"title": title if not session.get("messages") else session["title"], "updated_at": utcnow(),
                      "expires_at": utcnow() + timedelta(days=self.settings.conversation_retention_days)}})
         log_event(logging.getLogger("app.chat"), "answer generated", connection=connection["name"], model=connection["model"],
                   status=status, latency_ms=latency, source_count=len(sources))
         return message
+
+    async def ask(self, user: dict, session_id: str, question: str, connection: dict | None = None):
+        prepared = await self._prepare_answer(user, session_id, question, connection)
+        prepared["original_question"] = question
+        status = "ok"
+        if prepared["connection"]["provider"] == "mock":
+            answer = mock_answer(prepared["sources"])
+        else:
+            try:
+                encrypted_key = prepared["connection"].get("api_key_encrypted", "")
+                key = decrypt_secret(self.settings.encryption_key, encrypted_key) if encrypted_key else ""
+                answer = await complete(prepared["connection"], key, prepared["messages"], self.settings.llm_timeout_seconds)
+                answer = redact(answer)
+            except Exception as exc:
+                status = "error"
+                answer = f"The configured model could not answer this request ({type(exc).__name__}). Please try again or open a support ticket."
+        return await self._save_answer(prepared, answer, status)
+
+    async def ask_streaming(self, user: dict, session_id: str, question: str, connection: dict):
+        prepared = await self._prepare_answer(user, session_id, question, connection)
+        prepared["original_question"] = question
+        encrypted_key = connection.get("api_key_encrypted", "")
+        key = decrypt_secret(self.settings.encryption_key, encrypted_key) if encrypted_key else ""
+        return self._stream_answer(prepared, key)
+
+    async def _stream_answer(self, prepared: dict, api_key: str):
+        connection = prepared["connection"]
+        raw_parts = []
+        redactor = _StreamingAnswerRedactor()
+        try:
+            async for part in stream_complete(connection, api_key, prepared["messages"], self.settings.llm_timeout_seconds):
+                raw_parts.append(part)
+                safe_part = redactor.feed(part)
+                if safe_part:
+                    yield "chunk", {"text": safe_part}
+            tail = redactor.finish()
+            if tail:
+                yield "chunk", {"text": tail}
+            message = await self._save_answer(prepared, redact("".join(raw_parts)))
+            yield "done", message
+        except asyncio.CancelledError:
+            log_event(logging.getLogger("app.chat"), "answer stream disconnected", connection=connection["name"],
+                      model=connection["model"], status="disconnected",
+                      latency_ms=round((time.perf_counter() - prepared["started"]) * 1000))
+            raise
+        except Exception as exc:
+            log_event(logging.getLogger("app.chat"), "answer stream failed", connection=connection["name"],
+                      model=connection["model"], status="error", error_type=type(exc).__name__,
+                      latency_ms=round((time.perf_counter() - prepared["started"]) * 1000))
+            yield "error", {"message": "The configured model could not answer this request. Please try again or open a support ticket."}
+
+
+class _StreamingAnswerRedactor:
+    _private_key_start = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")
+    _private_key_end = re.compile(r"-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")
+
+    def __init__(self):
+        self.pending = ""
+
+    def feed(self, text: str) -> str:
+        self.pending += text
+        tokens = list(re.finditer(r"\S+", self.pending))
+        if len(tokens) <= 4:
+            return ""
+        cutoff = tokens[-4].start()
+        key_start = self._private_key_start.search(self.pending)
+        if key_start and not self._private_key_end.search(self.pending, key_start.end()):
+            cutoff = min(cutoff, key_start.start())
+        safe = redact(self.pending[:cutoff])
+        self.pending = self.pending[cutoff:]
+        return safe
+
+    def finish(self) -> str:
+        safe = redact(self.pending)
+        self.pending = ""
+        return safe
 
 
 class FeedbackService:

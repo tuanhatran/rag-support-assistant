@@ -4,11 +4,11 @@ Status: DONE
 
 ## Model Routing
 
-| Complexity | Coder | Tester | Reviewer |
-| --- | --- | --- | --- |
-| S | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
-| M | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
-| L | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| Complexity | Coder                      | Tester                     | Reviewer                   |
+| ---------- | -------------------------- | -------------------------- | -------------------------- |
+| S          | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| M          | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
+| L          | Gemini 3.8 Flash (copilot) | Gemini 3.8 Flash (copilot) | Claude Haiku 5.5 (copilot) |
 
 Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agent picker.
 
@@ -59,6 +59,7 @@ Planner model: Claude Haiku 5.5 (copilot). Use the exact model names in the agen
 All acceptance criteria have been verified and passed after the Dockerfile fix round.
 
 ### Test Commands and Results
+
 1. Backend Unit/API Suite:
    - Command: `cd backend && python -m pytest -q -p no:warnings`
    - Result: 38 passed in 1.74s (100% pass)
@@ -80,6 +81,7 @@ All acceptance criteria have been verified and passed after the Dockerfile fix r
      - `rbac.cy.ts`: 4 passed, 0 failed
 
 ### Review Verification
+
 - Verified `frontend/Dockerfile` has `ENV CYPRESS_INSTALL_BINARY=0` preceding `RUN npm install` in the build stage, avoiding Cypress binary downloads in Docker image builds.
 - Verified no application or backend implementation was modified.
 - Verified no secrets are logged, echoed, or committed.
@@ -89,6 +91,7 @@ All acceptance criteria have been verified and passed after the Dockerfile fix r
 
 Previous stage notes (coder to tester):
 Addressed review feedback:
+
 - Changed files: `frontend/Dockerfile`
 - Added `ENV CYPRESS_INSTALL_BINARY=0` before `RUN npm install` in the build stage of `frontend/Dockerfile` to prevent Cypress binary download during Docker build.
 - Test verification:
@@ -114,6 +117,7 @@ Previous stage notes (tester to reviewer):
 All acceptance criteria have been verified and passed.
 
 ### Test Commands and Results
+
 1. Backend Unit/API Suite:
    - Command: `cd backend && python -m pytest -q -p no:warnings`
    - Result: 38 passed in 1.73s (100% pass)
@@ -135,5 +139,6 @@ All acceptance criteria have been verified and passed.
      - `rbac.cy.ts`: 4 passed, 0 failed
 
 ### Changes Made During Testing
+
 - `frontend/cypress/e2e/chat.cy.ts`: Updated the conversation creation and deletion assertion in `creates and deletes conversations` to correctly account for clicking "New conversation" creating a second session in the rail, testing both creations and sequential deletions until the rail is empty.
 - No application or backend source files were modified. No secrets were logged, echoed, or committed. Screenshots directory was cleaned up and is ignored by `.gitignore`.

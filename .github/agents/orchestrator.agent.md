@@ -34,14 +34,14 @@ Every new development task uses one new branch shared by planning, coding, testi
 1. Try to read `.github/handoff/tasks/<TASK-ID>.md`. If it does not exist, the task is new: dispatch `planner`.
 2. Otherwise read `Status` in that file and dispatch the matching subagent with the `agent` tool, one at a time, waiting for each to finish.
 
-| Status | Subagent | Prompt |
-| --- | --- | --- |
-| file missing | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>." plus the user's task description, verbatim. |
-| `BLOCKED` and the user supplied a new decision or description | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>." plus the user's message, verbatim. |
-| `USER_CHANGES_REQUESTED` | `planner` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Incorporate the user's requirement changes recorded in the handoff." |
-| `READY_FOR_CODE`, `CHANGES_REQUESTED` | `coder` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file." |
-| `READY_FOR_TEST` | `tester` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file." |
-| `READY_FOR_REVIEW` | `reviewer` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file." |
+| Status                                                        | Subagent   | Prompt                                                                                                      |
+| ------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------- |
+| file missing                                                  | `planner`  | "Task ID: <TASK-ID>. Branch: <BRANCH>." plus the user's task description, verbatim.                         |
+| `BLOCKED` and the user supplied a new decision or description | `planner`  | "Task ID: <TASK-ID>. Branch: <BRANCH>." plus the user's message, verbatim.                                  |
+| `USER_CHANGES_REQUESTED`                                      | `planner`  | "Task ID: <TASK-ID>. Branch: <BRANCH>. Incorporate the user's requirement changes recorded in the handoff." |
+| `READY_FOR_CODE`, `CHANGES_REQUESTED`                         | `coder`    | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file."                                            |
+| `READY_FOR_TEST`                                              | `tester`   | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file."                                            |
+| `READY_FOR_REVIEW`                                            | `reviewer` | "Task ID: <TASK-ID>. Branch: <BRANCH>. Act on its handoff file."                                            |
 
 3. After each subagent returns, read the task file again and repeat from step 2.
 4. Track progress with the todo list: Plan, Code, Test, Review.
@@ -50,9 +50,9 @@ Every new development task uses one new branch shared by planning, coding, testi
 
 Always set the subagent `model` explicitly when dispatching, so the routing does not depend on the orchestrator's own model:
 
-| Subagent | `model` |
-| --- | --- |
-| `coder`, `tester` | `GPT-6 Luna` |
+| Subagent              | `model`      |
+| --------------------- | ------------ |
+| `coder`, `tester`     | `GPT-6 Luna` |
 | `planner`, `reviewer` | `GPT-6 Luna` |
 
 These match the `model` in each agent's own frontmatter. If the task file's routing table assigns a different model for its complexity, use that table instead.

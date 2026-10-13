@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 
+import httpx
 import pytest
 from bson import ObjectId
 from fastapi.testclient import TestClient
@@ -215,11 +218,19 @@ def test_admin_can_create_and_test_keyless_local_ollama_connection(harness, monk
     assert connection["has_api_key"] is False
     assert "api_key_encrypted" not in connection
 
+    edited = client.patch(f"/api/admin/connections/{connection['id']}", json={
+        "name": "Local DeepSeek Updated", "provider": "openai", "model": "deepseek-r1:14b",
+        "base_url": "http://localhost:11434/v1", "api_key": "", "plans": ["premium"],
+    })
+    assert edited.status_code == 200
+    connection = edited.json()
+    assert connection["has_api_key"] is False
+
     remote = client.post("/api/admin/connections", json={
         "name": "Remote OpenAI-compatible", "provider": "openai", "model": "remote-model",
         "base_url": "https://llm.example/v1", "api_key": "", "plans": ["basic"],
     })
-    assert remote.status_code >= 400
+    assert remote.status_code == 409
 
     from app.routers import admin as admin_router
     seen = {}
@@ -236,7 +247,7 @@ def test_admin_can_create_and_test_keyless_local_ollama_connection(harness, monk
     assert seen == {"api_key": "", "model": "deepseek-r1:14b"}
 
 
-def test_assigned_ollama_model_answers_user_question_and_logs_safe_metadata(harness, monkeypatch, caplog):
+def test_deepseek_r1_ollama_chat_streaming_returns_response_without_logging_sensitive_text(harness, monkeypatch, caplog):
     client, database = harness
     admin_id = ObjectId()
     database["users"].documents.append({"_id": admin_id, "username": "admin", "role": "admin", "plan": "premium",
@@ -255,22 +266,52 @@ def test_assigned_ollama_model_answers_user_question_and_logs_safe_metadata(harn
     })
     assert registered.status_code == 201
     assert registered.json()["model"] == "deepseek-r1:14b"
-    called = {}
-
-    async def fake_complete(connection, api_key, messages, timeout):
-        called.update(provider=connection["provider"], model=connection["model"], api_key=api_key)
-        return "Ollama-compatible test response"
-
+    from app import llm as llm_module
     from app import services as services_module
-    monkeypatch.setattr(services_module, "complete", fake_complete)
+    called = {}
+    upstream_events = (
+        'data: {"choices":[{"delta":{"content":"Restart the VPN client and then "}}]}\n\n'
+        'data: {"choices":[{"delta":{"content":"reconnect; token=answer-secret-value"}}]}\n\n'
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+        'data: [DONE]\n\n'
+    )
+
+    def ollama_chat(request):
+        called["url"] = str(request.url)
+        called["authorization"] = request.headers.get("authorization")
+        called["payload"] = json.loads(request.content)
+        assert json.loads(request.content)["stream"] is True
+        return httpx.Response(200, content=upstream_events, headers={"Content-Type": "text/event-stream"})
+
+    async def mocked_ollama_stream(connection, api_key, messages, timeout):
+        async for part in llm_module.stream_complete(connection, api_key, messages, timeout,
+                                                      transport=httpx.MockTransport(ollama_chat)):
+            yield part
+
+    monkeypatch.setattr(services_module, "stream_complete", mocked_ollama_stream)
     caplog.set_level(logging.INFO, logger="app.chat")
     session = client.post("/api/chat/sessions").json()
-    response = client.post(f"/api/chat/sessions/{session['id']}/messages", json={"question": "VPN stuck on connecting"})
+    question = "VPN stuck on connecting; password=question-secret-value"
+    response = client.post(f"/api/chat/sessions/{session['id']}/messages", json={"question": question})
 
     assert response.status_code == 200
-    assert response.json()["answer"] == "Ollama-compatible test response"
-    assert response.json()["model"]["model"] == "deepseek-r1:14b"
-    assert called == {"provider": "openai", "model": "deepseek-r1:14b", "api_key": ""}
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = [item for item in response.text.strip().split("\n\n") if item]
+    chunk_text = [json.loads(item.split("data: ", 1)[1])["text"] for item in events
+                  if item.startswith("event: chunk\n")]
+    completed = next(json.loads(item.split("data: ", 1)[1]) for item in events if item.startswith("event: done\n"))
+    assert len(chunk_text) > 1
+    assert "".join(chunk_text) == "Restart the VPN client and then reconnect; token=[REDACTED]"
+    assert "answer-secret-value" not in response.text
+    assert completed["answer"] == "Restart the VPN client and then reconnect; token=[REDACTED]"
+    assert completed["model"]["model"] == "deepseek-r1:14b"
+    assert completed["sources"]
+    assert database["chat_sessions"].documents[0]["messages"][0]["answer"] == completed["answer"]
+    assert called["url"] == "http://localhost:11434/v1/chat/completions"
+    assert called["authorization"] is None
+    assert called["payload"]["model"] == "deepseek-r1:14b"
+    assert called["payload"]["stream"] is True
+    assert called["payload"]["messages"][-1] == {"role": "user", "content": "VPN stuck on connecting; password=[REDACTED]"}
     invocation_logs = [record for record in caplog.records
                        if record.name == "app.chat" and record.getMessage() == "answer generated"]
     assert len(invocation_logs) == 1
@@ -278,10 +319,82 @@ def test_assigned_ollama_model_answers_user_question_and_logs_safe_metadata(harn
     assert log_fields["model"] == "deepseek-r1:14b"
     assert log_fields["status"] == "ok"
     log_payload = repr(log_fields)
-    assert "VPN stuck on connecting" not in log_payload
-    assert "Ollama-compatible test response" not in log_payload
-    assert "VPN stuck on connecting" not in caplog.text
-    assert "Ollama-compatible test response" not in caplog.text
+    sensitive_values = ("question-secret-value", "answer-secret-value", "VPN stuck on connecting")
+    assert all(value not in log_payload for value in sensitive_values)
+    assert all(value not in caplog.text for value in sensitive_values)
+
+
+@pytest.mark.parametrize("upstream_body", [
+    'data: {"choices":[{"delta":{"content":"This partial answer is long enough to stream before provider fails."}}]}\n\n'
+    'data: {"error":{"message":"private-provider-error-secret"}}\n\n',
+    'data: {"choices":[{"delta":{"content":"This partial answer is long enough to stream before provider disconnects."}}]}\n\n',
+])
+def test_ollama_streaming_failure_does_not_persist_partial_answer(harness, monkeypatch, caplog, upstream_body):
+    client, database = harness
+    admin_id = ObjectId()
+    database["users"].documents.append({"_id": admin_id, "username": "admin", "role": "admin", "plan": "premium",
+        "password": hash_password("admin password long"),
+        "policy_consent": {"version": "current-policy", "accepted_at": datetime.now(timezone.utc)}})
+    assert client.post("/api/auth/login", json={"username": "admin", "password": "admin password long"}).status_code == 200
+    configured = client.post("/api/admin/connections", json={
+        "name": "Local Ollama", "provider": "openai", "model": "configured-model",
+        "base_url": "http://localhost:11434/v1", "api_key": "", "plans": ["premium"],
+    })
+    assert configured.status_code == 201
+    client.post("/api/auth/logout")
+    assert client.post("/api/auth/register", json={
+        "username": "stream-user", "password": "correct horse battery", "plan": "premium", "policy_accepted": True,
+    }).status_code == 201
+
+    from app import llm as llm_module
+    from app import services as services_module
+
+    def upstream(request):
+        assert json.loads(request.content)["stream"] is True
+        return httpx.Response(200, content=upstream_body, headers={"Content-Type": "text/event-stream"})
+
+    async def mocked_stream(connection, api_key, messages, timeout):
+        async for part in llm_module.stream_complete(connection, api_key, messages, timeout,
+                                                      transport=httpx.MockTransport(upstream)):
+            yield part
+
+    monkeypatch.setattr(services_module, "stream_complete", mocked_stream)
+    caplog.set_level(logging.INFO, logger="app.chat")
+    session = client.post("/api/chat/sessions").json()
+    response = client.post(f"/api/chat/sessions/{session['id']}/messages", json={"question": "Where is the VPN guide?"})
+
+    assert response.status_code == 200
+    assert 'event: chunk' in response.text
+    assert 'event: error' in response.text
+    assert "The configured model could not answer this request." in response.text
+    assert "private-provider-error-secret" not in response.text
+    assert database["chat_sessions"].documents[0]["messages"] == []
+    assert "private-provider-error-secret" not in caplog.text
+
+
+@pytest.mark.anyio
+async def test_ollama_streaming_cancellation_does_not_persist_partial_answer(harness, monkeypatch):
+    client, database = harness
+    assert register(client).status_code == 201
+    session = client.post("/api/chat/sessions").json()
+    user = database["users"].documents[0]
+    connection = {"_id": "local-ollama", "name": "Local Ollama", "provider": "openai",
+                  "model": "configured-model", "api_key_encrypted": ""}
+    from app import services as services_module
+
+    async def cancelled_stream(*args, **kwargs):
+        yield "This partial answer is long enough to stream before cancellation."
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(services_module, "stream_complete", cancelled_stream)
+    stream = await client.app.state.container.chat.ask_streaming(
+        user, session["id"], "Where is the VPN guide?", connection,
+    )
+
+    assert (await anext(stream))[0] == "chunk"
+    with pytest.raises(asyncio.CancelledError):
+        await anext(stream)
+    assert database["chat_sessions"].documents[0]["messages"] == []
 
 
 def test_chat_hybrid_retrieval_includes_redacted_active_chunk_and_attribution(harness, monkeypatch):
