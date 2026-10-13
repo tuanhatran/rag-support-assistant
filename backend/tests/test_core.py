@@ -6,12 +6,12 @@ import httpx
 import pytest
 
 from app.config import Settings
-from app.llm import complete, mock_answer
+from app.llm import complete, is_keyless_ollama, mock_answer
 from app.rag import KnowledgeBase, tokenize
 from app.redaction import redact
 from app.schemas import ConnectionRequest
 from app.security import hash_password, hash_token, verify_password
-from app.services import PrivacyService
+from app.services import ChatService, PrivacyService
 
 
 DOCUMENTS = Path(__file__).parents[1] / "app" / "data" / "documents"
@@ -44,6 +44,25 @@ def test_mock_answer_cites_the_top_source(knowledge_base):
     sources = knowledge_base.search("VPN stuck on connecting")
     answer = mock_answer(sources)
     assert "According to **VPN Connection Issues > Fix: stuck on \"Connecting\"** [1]" in answer
+
+
+def test_hybrid_source_merge_is_deterministic_and_deduplicates_text():
+    bundled = {"document_id": "runbook", "document_title": "Runbook", "section": "VPN",
+               "text": "Shared troubleshooting guidance."}
+    ingested = {"document_title": "Uploaded guide", "section": "Chunk 1", "source_type": "ingested",
+                "pipeline_id": "pipeline-1", "chunk_index": 0, "text": "Shared troubleshooting guidance."}
+    bundled_second = {"document_id": "other", "document_title": "Other", "section": "Other",
+                      "text": "Another bundled instruction."}
+    ingested_second = {"document_title": "Uploaded guide", "section": "Chunk 2", "source_type": "ingested",
+                       "pipeline_id": "pipeline-1", "chunk_index": 1, "text": "Another uploaded instruction."}
+
+    ranked_lists = [[bundled, bundled_second], [ingested, ingested_second]]
+    merged = ChatService._merge_ranked_sources(ranked_lists, 4)
+
+    assert merged == ChatService._merge_ranked_sources(ranked_lists, 4)
+    assert len(merged) == 3
+    assert merged[0]["source_type"] == "bundled"
+    assert {source["source_type"] for source in merged} == {"bundled", "ingested"}
 
 
 def test_knowledge_base_parses_ten_markdown_documents(knowledge_base):
@@ -116,6 +135,43 @@ async def test_openai_client_uses_compatible_url_and_bearer_header():
     assert observed["url"] == "https://llm.example/v1/chat/completions"
     assert observed["authorization"] == "Bearer private-test-key"
     assert b"test-model" in observed["body"]
+
+
+@pytest.mark.asyncio
+async def test_ollama_openai_compatible_client_omits_authorization_header():
+    observed = {}
+
+    async def handler(request: httpx.Request):
+        observed["url"] = str(request.url)
+        observed["authorization"] = request.headers.get("authorization")
+        observed["body"] = await request.aread()
+        return httpx.Response(200, json={"choices": [{"message": {"content": "Local answer"}}]})
+
+    connection = {"provider": "openai", "model": "deepseek-r1:14b",
+                  "base_url": "http://localhost:11434/v1"}
+    answer = await complete(connection, "", [{"role": "user", "content": "hello"}], 3,
+                            transport=httpx.MockTransport(handler))
+
+    assert answer == "Local answer"
+    assert observed["url"] == "http://localhost:11434/v1/chat/completions"
+    assert observed["authorization"] is None
+    assert b"deepseek-r1:14b" in observed["body"]
+
+
+def test_keyless_openai_configuration_is_limited_to_local_ollama():
+    assert is_keyless_ollama({"provider": "openai", "base_url": "http://localhost:11434/v1"})
+    assert is_keyless_ollama({"provider": "openai", "base_url": "http://host.docker.internal:11434/v1"})
+    assert not is_keyless_ollama({"provider": "openai", "base_url": "https://api.openai.com/v1"})
+    assert not is_keyless_ollama({"provider": "anthropic", "base_url": "http://localhost:11434/v1"})
+
+
+@pytest.mark.asyncio
+async def test_keyless_openai_client_rejects_non_ollama_endpoint():
+    from app.errors import ConfigurationError
+
+    with pytest.raises(ConfigurationError, match="API key is required"):
+        await complete({"provider": "openai", "model": "test-model", "base_url": "https://llm.example/v1"},
+                       "", [{"role": "user", "content": "hello"}], 3)
 
 
 @pytest.mark.asyncio

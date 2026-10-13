@@ -6,7 +6,7 @@ This document records the main implementation trade-offs for the RAG Support Ass
 
 - **Keep the product small and self-contained.** The backend is a FastAPI application, the frontend is React with TypeScript, MongoDB stores accounts, conversations, feedback, model connections, audit events, and ingestion pipeline history, and PostgreSQL with pgvector stores ingested document chunks and embeddings. This keeps the demo easy to run while retaining clear HTTP, service, and repository boundaries.
 - **Use BM25 rather than a vector database for retrieval.** The knowledge base is small and local, so lexical ranking avoids an embedding service, vector-store operations, and extra infrastructure. Documents are split at Markdown `##` headings and indexed with their title, tags, section name, and body. Retrieval returns up to four sections and filters weak matches against the best score.
-- **Keep BM25 as the chat retriever for now.** The admin ingestion pipeline can create embeddings and store chunks in pgvector using Cloudflare Workers AI, local FastEmbed, or OpenAI, but chat still retrieves from the bundled BM25 index. This avoids changing chat retrieval before measuring quality, but ingested documents are not yet used to answer chat questions.
+- **Use hybrid retrieval with a lexical fallback.** Chat ranks bundled runbooks with BM25 and uses the embedding provider recorded with active ingested chunks to search pgvector. Candidate ranks are merged deterministically, while BM25 remains usable if PostgreSQL or query embedding is unavailable.
 - **Retain a mock LLM provider.** The built-in simulator makes the application runnable without external credentials and provides a predictable development and demo path. OpenAI-compatible, Azure OpenAI, and Anthropic providers are available when configured.
 - **Ground generated answers in retrieved context.** The prompt instructs providers to answer only from supplied context, cite numbered sources, and acknowledge when the corpus lacks an answer. Prompt instructions reduce unsupported answers but are not a guarantee; model output still needs evaluation.
 
@@ -33,7 +33,7 @@ This document records the main implementation trade-offs for the RAG Support Ass
 
 ## Current Limitations
 
-- The bundled knowledge base is small and indexed at startup. Admins can upload `.txt` and `.pdf` documents through an ingestion pipeline; pipeline status is kept in MongoDB and chunks and embeddings are stored in PostgreSQL with pgvector. Ingested documents are not yet part of chat retrieval, and there is no source-version tracking or reindex workflow.
+- The bundled knowledge base is small and indexed at startup. Admins can upload `.txt` and `.pdf` documents through an ingestion pipeline; pipeline status is kept in MongoDB and chunks and embeddings are stored in PostgreSQL with pgvector. Active ingested chunks now participate in chat retrieval; there is no source-version tracking or reindex workflow.
 - Ingestion runs as background asyncio tasks inside the API process. It is currently single-process: a process restart marks unfinished jobs as interrupted, and there is no durable queue or distributed worker coordination for horizontal scaling.
 - Retrieval is lexical, English-oriented, and uses a fixed tokenizer and score threshold. It can miss synonyms, multilingual queries, and relevant passages with little word overlap; a score is not a calibrated confidence value.
 - Bundled-document chunking follows Markdown headings without token-aware sizing or overlap. Uploaded-document chunking uses configured separators and character limits, not token-aware sizing; neither path has been evaluated for retrieval quality at scale.
@@ -47,7 +47,7 @@ This document records the main implementation trade-offs for the RAG Support Ass
 2. Make ingestion safe to scale beyond one API process by moving background jobs to a durable queue and workers, with retry and idempotency behavior.
 3. Add pull-request and release CI for backend tests, frontend build and end-to-end checks, dependency and deployment-artifact scanning, and staged deployment with rollback.
 4. Create a small, versioned evaluation set of representative questions, expected source sections, answerability labels, and acceptable outcomes. Report retrieval recall/ranking, citation validity, groundedness, latency, and failure behavior separately for the mock provider and configured models.
-5. Change chat to use newly ingested documents. Compare BM25 and embedding-based retrieval on the same evaluation set before changing the default; keep a lexical fallback and record which retrieval path produced each answer.
+5. Evaluate hybrid retrieval on a versioned question set. Compare source recall and ranking across BM25, pgvector, and merged candidates; tune fusion while preserving the lexical fallback.
 6. Improve ingestion with token-aware chunking, validation, source-version tracking, and an explicit reindex operation as the corpus grows.
 7. Add citation and answer-grounding checks, plus tests for unanswerable and adversarial questions, before relying on generated answers in higher-risk support workflows.
 8. Review redaction rules, retention settings, backups, and recovery procedures against the deployment's data policy and threat model.

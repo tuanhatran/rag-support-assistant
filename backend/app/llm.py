@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 import httpx
 
 from app.errors import ConfigurationError
@@ -8,6 +10,21 @@ from app.errors import ConfigurationError
 SYSTEM_PROMPT = ("You are an IT troubleshooting support assistant. Answer ONLY from the supplied context. "
                  "Use concise Markdown steps and cite sources as [n]. If context lacks the answer, say so and suggest a ticket. "
                  "Never invent commands, settings, or URLs.")
+
+
+def is_keyless_ollama(connection: dict) -> bool:
+    if connection.get("provider") != "openai":
+        return False
+    try:
+        endpoint = urlsplit(connection.get("base_url", ""))
+        hostname = (endpoint.hostname or "").lower()
+        port = endpoint.port
+    except ValueError:
+        return False
+    return (endpoint.scheme == "http" and endpoint.path.rstrip("/") == "/v1"
+            and not endpoint.username and not endpoint.password
+            and not endpoint.query and not endpoint.fragment and port == 11434
+            and hostname in {"localhost", "127.0.0.1", "::1", "host.docker.internal"})
 
 
 def build_messages(question: str, sources: list[dict], history: list[dict]) -> list[dict]:
@@ -39,8 +56,11 @@ async def complete(connection: dict, api_key: str, messages: list[dict], timeout
     headers = {}
     if provider == "openai":
         base = base or "https://api.openai.com/v1"
+        if not api_key and not is_keyless_ollama(connection):
+            raise ConfigurationError("An API key is required for this OpenAI-compatible endpoint")
         url = base + "/chat/completions"
-        headers = {"Authorization": f"Bearer {api_key}"}
+        if api_key:
+            headers = {"Authorization": f"Bearer {api_key}"}
         payload = {"model": connection["model"], "messages": messages,
                    "temperature": connection.get("temperature", 0.2), "max_tokens": connection.get("max_tokens", 1200)}
     elif provider == "azure_openai":

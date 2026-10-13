@@ -17,6 +17,12 @@ class VectorStore(Protocol):
     async def get_chunks_preview(self, pipeline_id: str) -> list[dict[str, Any]]:
         ...
 
+    async def list_embedding_models(self) -> list[str]:
+        ...
+
+    async def search_chunks(self, embedding: list[float], model: str, limit: int) -> list[dict[str, Any]]:
+        ...
+
     async def sweep_expired(self) -> int:
         ...
 
@@ -125,6 +131,49 @@ class PgVectorStore:
         finally:
             await conn.close()
 
+    async def list_embedding_models(self) -> list[str]:
+        conn = await self._get_connection()
+        try:
+            async with conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "SELECT DISTINCT model FROM document_chunks WHERE expires_at > NOW() ORDER BY model;"
+                    )
+                    return [row[0] for row in await cur.fetchall()]
+        finally:
+            await conn.close()
+
+    async def search_chunks(self, embedding: list[float], model: str, limit: int) -> list[dict[str, Any]]:
+        conn = await self._get_connection()
+        try:
+            async with conn:
+                async with conn.cursor() as cur:
+                    vector = "[" + ",".join(str(value) for value in embedding) + "]"
+                    await cur.execute(
+                        """
+                        SELECT id, pipeline_id, chunk_index, content, model,
+                               1 - (embedding <=> %s::vector) AS similarity
+                        FROM document_chunks
+                        WHERE model = %s AND expires_at > NOW() AND embedding IS NOT NULL
+                        ORDER BY embedding <=> %s::vector, id
+                        LIMIT %s;
+                        """,
+                        (vector, model, vector, limit),
+                    )
+                    return [
+                        {
+                            "id": row[0],
+                            "pipeline_id": row[1],
+                            "chunk_index": row[2],
+                            "content": row[3],
+                            "model": row[4],
+                            "similarity": float(row[5]),
+                        }
+                        for row in await cur.fetchall()
+                    ]
+        finally:
+            await conn.close()
+
     async def sweep_expired(self) -> int:
         conn = await self._get_connection()
         try:
@@ -165,6 +214,41 @@ class FakeVectorStore:
             for c in matching
         ]
 
+    async def list_embedding_models(self) -> list[str]:
+        now = utcnow()
+        return sorted({
+            chunk["model"] for chunk in self.chunks
+            if chunk.get("expires_at", now) > now and chunk.get("embedding") is not None
+        })
+
+    async def search_chunks(self, embedding: list[float], model: str, limit: int) -> list[dict[str, Any]]:
+        from math import sqrt
+
+        now = utcnow()
+        query_norm = sqrt(sum(value * value for value in embedding))
+        matches = []
+        for chunk in self.chunks:
+            stored_embedding = chunk.get("embedding")
+            if (chunk.get("model") != model or chunk.get("expires_at", now) <= now
+                    or stored_embedding is None or len(stored_embedding) != len(embedding)):
+                continue
+            stored_norm = sqrt(sum(value * value for value in stored_embedding))
+            similarity = (sum(left * right for left, right in zip(embedding, stored_embedding))
+                          / (query_norm * stored_norm)) if query_norm and stored_norm else 0.0
+            matches.append((similarity, chunk))
+        matches.sort(key=lambda item: (-item[0], item[1]["id"]))
+        return [
+            {
+                "id": chunk["id"],
+                "pipeline_id": chunk["pipeline_id"],
+                "chunk_index": chunk["chunk_index"],
+                "content": chunk["content"],
+                "model": chunk["model"],
+                "similarity": similarity,
+            }
+            for similarity, chunk in matches[:limit]
+        ]
+
     async def sweep_expired(self) -> int:
         now = utcnow()
         before = len(self.chunks)
@@ -183,6 +267,12 @@ class UnconfiguredVectorStore:
         raise ConfigurationError("PostgreSQL vector store is not configured (RAG_PGVECTOR_DSN missing)")
 
     async def get_chunks_preview(self, pipeline_id: str) -> list[dict[str, Any]]:
+        raise ConfigurationError("PostgreSQL vector store is not configured (RAG_PGVECTOR_DSN missing)")
+
+    async def list_embedding_models(self) -> list[str]:
+        raise ConfigurationError("PostgreSQL vector store is not configured (RAG_PGVECTOR_DSN missing)")
+
+    async def search_chunks(self, embedding: list[float], model: str, limit: int) -> list[dict[str, Any]]:
         raise ConfigurationError("PostgreSQL vector store is not configured (RAG_PGVECTOR_DSN missing)")
 
     async def sweep_expired(self) -> int:

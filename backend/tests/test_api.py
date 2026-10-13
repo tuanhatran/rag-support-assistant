@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from bson import ObjectId
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.main import create_app
 from app.security import hash_password, hash_token
+from app.vectorstore import FakeVectorStore
 from tests.fakes import FakeDatabase
 
 
@@ -194,3 +196,169 @@ def test_last_admin_cannot_be_demoted(harness):
     response = client.patch(f"/api/admin/users/{admin_id}", json={"role": "user"})
     assert response.status_code == 409
     assert next(item for item in database["users"].documents if item["_id"] == admin_id)["role"] == "admin"
+
+
+def test_admin_can_create_and_test_keyless_local_ollama_connection(harness, monkeypatch):
+    client, database = harness
+    admin_id = ObjectId()
+    database["users"].documents.append({"_id": admin_id, "username": "admin", "role": "admin", "plan": "premium",
+        "password": hash_password("admin password long"),
+        "policy_consent": {"version": "current-policy", "accepted_at": datetime.now(timezone.utc)}})
+    assert client.post("/api/auth/login", json={"username": "admin", "password": "admin password long"}).status_code == 200
+
+    response = client.post("/api/admin/connections", json={
+        "name": "Local DeepSeek", "provider": "openai", "model": "deepseek-r1:14b",
+        "base_url": "http://localhost:11434/v1", "api_key": "", "plans": ["premium"],
+    })
+    assert response.status_code == 201
+    connection = response.json()
+    assert connection["has_api_key"] is False
+    assert "api_key_encrypted" not in connection
+
+    remote = client.post("/api/admin/connections", json={
+        "name": "Remote OpenAI-compatible", "provider": "openai", "model": "remote-model",
+        "base_url": "https://llm.example/v1", "api_key": "", "plans": ["basic"],
+    })
+    assert remote.status_code >= 400
+
+    from app.routers import admin as admin_router
+    seen = {}
+
+    async def fake_complete(connection, api_key, messages, timeout):
+        seen["api_key"] = api_key
+        seen["model"] = connection["model"]
+        return "Connection confirmed"
+
+    monkeypatch.setattr(admin_router, "complete", fake_complete)
+    tested = client.post(f"/api/admin/connections/{connection['id']}/test")
+    assert tested.status_code == 200
+    assert tested.json() == {"ok": True, "message": "Connection confirmed"}
+    assert seen == {"api_key": "", "model": "deepseek-r1:14b"}
+
+
+def test_assigned_ollama_model_answers_user_question_and_logs_safe_metadata(harness, monkeypatch, caplog):
+    client, database = harness
+    admin_id = ObjectId()
+    database["users"].documents.append({"_id": admin_id, "username": "admin", "role": "admin", "plan": "premium",
+        "password": hash_password("admin password long"),
+        "policy_consent": {"version": "current-policy", "accepted_at": datetime.now(timezone.utc)}})
+    assert client.post("/api/auth/login", json={"username": "admin", "password": "admin password long"}).status_code == 200
+    configured = client.post("/api/admin/connections", json={
+        "name": "Local DeepSeek", "provider": "openai", "model": "deepseek-r1:14b",
+        "base_url": "http://localhost:11434/v1", "api_key": "", "plans": ["premium"],
+    })
+    assert configured.status_code == 201
+    client.post("/api/auth/logout")
+
+    registered = client.post("/api/auth/register", json={
+        "username": "ollama-user", "password": "correct horse battery", "plan": "premium", "policy_accepted": True,
+    })
+    assert registered.status_code == 201
+    assert registered.json()["model"] == "deepseek-r1:14b"
+    called = {}
+
+    async def fake_complete(connection, api_key, messages, timeout):
+        called.update(provider=connection["provider"], model=connection["model"], api_key=api_key)
+        return "Ollama-compatible test response"
+
+    from app import services as services_module
+    monkeypatch.setattr(services_module, "complete", fake_complete)
+    caplog.set_level(logging.INFO, logger="app.chat")
+    session = client.post("/api/chat/sessions").json()
+    response = client.post(f"/api/chat/sessions/{session['id']}/messages", json={"question": "VPN stuck on connecting"})
+
+    assert response.status_code == 200
+    assert response.json()["answer"] == "Ollama-compatible test response"
+    assert response.json()["model"]["model"] == "deepseek-r1:14b"
+    assert called == {"provider": "openai", "model": "deepseek-r1:14b", "api_key": ""}
+    invocation_logs = [record for record in caplog.records
+                       if record.name == "app.chat" and record.getMessage() == "answer generated"]
+    assert len(invocation_logs) == 1
+    log_fields = vars(invocation_logs[0])["fields"]
+    assert log_fields["model"] == "deepseek-r1:14b"
+    assert log_fields["status"] == "ok"
+    log_payload = repr(log_fields)
+    assert "VPN stuck on connecting" not in log_payload
+    assert "Ollama-compatible test response" not in log_payload
+    assert "VPN stuck on connecting" not in caplog.text
+    assert "Ollama-compatible test response" not in caplog.text
+
+
+def test_chat_hybrid_retrieval_includes_redacted_active_chunk_and_attribution(harness, monkeypatch):
+    client, database = harness
+    assert register(client).status_code == 201
+    container = client.app.state.container
+    vectorstore = FakeVectorStore()
+    container.chat.vectorstore = vectorstore
+    pipeline_id = ObjectId()
+    expires_at = datetime.now(timezone.utc) + timedelta(days=20)
+    database["ingestion_pipelines"].documents.append({
+        "_id": pipeline_id, "filename": "Network repair.txt", "expires_at": expires_at,
+    })
+    vectorstore.chunks.extend([
+        {"id": f"{pipeline_id}:0", "pipeline_id": str(pipeline_id), "chunk_index": 0,
+         "content": "Stored redacted guidance for edge-router recovery.",
+         "model": "@cf/baai/bge-small-en-v1.5", "embedding": [0.1] * 384, "expires_at": expires_at},
+        {"id": "expired:0", "pipeline_id": str(ObjectId()), "chunk_index": 0,
+         "content": "Expired private chunk must stay hidden.",
+         "model": "@cf/baai/bge-small-en-v1.5", "embedding": [0.1] * 384,
+         "expires_at": datetime.now(timezone.utc) - timedelta(days=1)},
+    ])
+
+    class TestEmbeddingProvider:
+        async def embed(self, texts):
+            assert len(texts) == 1
+            return [[0.1] * 384]
+
+    container.chat.embedding_provider_factory = lambda model, settings: TestEmbeddingProvider()
+    connection = database["llm_connections"].documents[0]
+    connection.update({"provider": "openai", "model": "test-model", "base_url": "https://llm.example/v1",
+                       "api_key_encrypted": "test-encrypted-key"})
+    captured = {}
+
+    async def fake_complete(connection, api_key, messages, timeout):
+        captured["messages"] = messages
+        return "Grounded response"
+
+    from app import services as services_module
+    monkeypatch.setattr(services_module, "decrypt_secret", lambda key, value: "test-api-key")
+    monkeypatch.setattr(services_module, "complete", fake_complete)
+    session = client.post("/api/chat/sessions").json()
+    response = client.post(f"/api/chat/sessions/{session['id']}/messages", json={"question": "VPN stuck on connecting"})
+
+    assert response.status_code == 200
+    sources = response.json()["sources"]
+    ingested = next(source for source in sources if source["source_type"] == "ingested")
+    assert ingested["document_title"] == "Network repair.txt"
+    assert ingested["pipeline_id"] == str(pipeline_id)
+    assert ingested["chunk_index"] == 0
+    assert "text" not in ingested
+    assert any(source["source_type"] == "bundled" for source in sources)
+    assert "Stored redacted guidance for edge-router recovery." in captured["messages"][0]["content"]
+    assert "Expired private chunk must stay hidden." not in captured["messages"][0]["content"]
+
+
+def test_chat_falls_back_to_bm25_when_query_embedding_fails(harness):
+    client, _ = harness
+    assert register(client).status_code == 201
+    container = client.app.state.container
+    vectorstore = FakeVectorStore()
+    container.chat.vectorstore = vectorstore
+    vectorstore.chunks.append({
+        "id": "active:0", "pipeline_id": str(ObjectId()), "chunk_index": 0,
+        "content": "Unavailable embedding path content.", "model": "@cf/baai/bge-small-en-v1.5",
+        "embedding": [0.1] * 384, "expires_at": datetime.now(timezone.utc) + timedelta(days=2),
+    })
+
+    class FailedEmbeddingProvider:
+        async def embed(self, texts):
+            raise RuntimeError("provider unavailable")
+
+    container.chat.embedding_provider_factory = lambda model, settings: FailedEmbeddingProvider()
+    session = client.post("/api/chat/sessions").json()
+    response = client.post(f"/api/chat/sessions/{session['id']}/messages", json={"question": "VPN stuck on connecting"})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["sources"]
+    assert all(source["source_type"] == "bundled" for source in response.json()["sources"])

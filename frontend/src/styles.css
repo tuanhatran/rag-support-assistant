@@ -8,7 +8,19 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
   background: var(--canvas);
+  caret-color: var(--green);
+}
+::selection {
+  color: var(--green-dark);
+  background: var(--lime);
+}
+* {
+  scrollbar-color: #aabbb0 transparent;
+  scrollbar-width: thin;
 }
 button,
 input,
@@ -162,18 +174,18 @@ h3 {
   background: #e3eee7;
   color: var(--green-dark);
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
 }
 .user-name {
   display: flex;
   flex-direction: column;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
 }
 .user-name small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   margin-top: 2px;
   text-transform: capitalize;
@@ -186,8 +198,8 @@ h3 {
   border-radius: 4px;
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   padding: 0;
 }
 .icon-button:hover {
@@ -198,7 +210,7 @@ h3 {
   border-left: 1px solid var(--line);
   border-radius: 0;
   padding-left: 14px;
-  width: 42px;
+  width: 48px;
 }
 .page-body {
   flex: 1;
@@ -206,8 +218,8 @@ h3 {
 }
 .eyebrow {
   display: block;
-  color: #7c8981;
-  font: 500 10px var(--mono);
+  color: #627168;
+  font: 500 11px var(--mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -375,7 +387,7 @@ h3 {
   display: grid;
   gap: 7px;
   color: #34433b;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 .auth-form input:not([type='checkbox']),
@@ -450,7 +462,7 @@ h3 {
 }
 .plan-description {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.4;
 }
 .plan-option small {
@@ -490,13 +502,13 @@ h3 {
   background: #fff;
   color: #314239;
   border-radius: 3px;
-  min-height: 38px;
+  min-height: 42px;
   padding: 0 13px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -515,8 +527,8 @@ h3 {
   color: #fff;
 }
 .button-small {
-  min-height: 32px;
-  font-size: 11px;
+  min-height: 36px;
+  font-size: 12px;
   padding: 0 10px;
 }
 .button-danger {
@@ -536,7 +548,8 @@ h3 {
   padding: 0 15px;
 }
 .form-error {
-  border-left: 3px solid #bd553e;
+  border: 1px solid #e8b9ad;
+  border-radius: 4px;
   background: #fff1ec;
   color: #8f392d;
   padding: 10px 12px;
@@ -544,9 +557,9 @@ h3 {
 }
 .auth-note {
   margin: 20px 0 0;
-  color: #87938b;
+  color: var(--muted);
   line-height: 1.6;
-  font-size: 11px;
+  font-size: 12px;
 }
 .auth-bottom {
   display: flex;
@@ -635,12 +648,12 @@ h3 {
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 .thread-select small {
   color: #8c9990;
-  font: 9px var(--mono);
+  font: 10px var(--mono);
 }
 .thread-delete {
   opacity: 0;
@@ -682,11 +695,11 @@ h3 {
 }
 .knowledge-note b {
   color: #345849;
-  font-size: 10px;
+  font-size: 11px;
 }
 .knowledge-note small {
   color: #77867d;
-  font-size: 9px;
+  font-size: 10px;
 }
 .text-button {
   border: 0;
@@ -719,7 +732,7 @@ h3 {
 }
 .chat-toolbar h1 {
   margin: 5px 0 0;
-  font-size: 19px;
+  font-size: 21px;
   max-width: min(60vw, 700px);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -755,11 +768,11 @@ h3 {
 }
 .welcome-state h2 {
   margin: 0 0 7px;
-  font-size: 22px;
+  font-size: 24px;
 }
 .welcome-state > p {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 .suggestion-grid {
   margin: 26px auto 0;
@@ -769,7 +782,7 @@ h3 {
   text-align: left;
 }
 .suggestion {
-  min-height: 58px;
+  min-height: 64px;
   position: relative;
   display: grid;
   grid-template-columns: 30px 1fr 18px;
@@ -780,7 +793,7 @@ h3 {
   background: #fbfcfa;
   border: 1px solid #e3e9e3;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.45;
   color: #425249;
   cursor: pointer;
@@ -839,7 +852,7 @@ h3 {
   padding: 12px 14px;
   color: #283a30;
   line-height: 1.6;
-  font-size: 13px;
+  font-size: 14px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -872,7 +885,7 @@ h3 {
   align-items: center;
   gap: 7px;
   color: #8b968f;
-  font: 9px var(--mono);
+  font: 10px var(--mono);
   text-transform: uppercase;
   margin: 5px 0 12px;
 }
@@ -904,7 +917,7 @@ h3 {
 }
 .markdown {
   color: #35443b;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.72;
   overflow-wrap: anywhere;
 }
@@ -993,7 +1006,7 @@ h3 {
   background: #fbfcfa;
   border-radius: 3px;
   color: #4d5d53;
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
@@ -1016,7 +1029,7 @@ h3 {
   align-items: center;
   gap: 8px;
   color: #8d9890;
-  font-size: 10px;
+  font-size: 11px;
 }
 .rating-button {
   border: 0;
@@ -1101,7 +1114,7 @@ h3 {
   outline: 0;
   padding: 4px 0;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.55;
 }
 .composer textarea::placeholder {
@@ -1109,8 +1122,8 @@ h3 {
 }
 .send-button {
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   border: 0;
   border-radius: 3px;
   color: #fff;
@@ -1130,7 +1143,7 @@ h3 {
   align-items: center;
   gap: 10px;
   color: #96a198;
-  font-size: 9px;
+  font-size: 10px;
 }
 .composer-foot span:first-child {
   display: flex;
@@ -1191,7 +1204,7 @@ h3 {
 .page-heading p {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 .document-count,
 .privacy-stamp,
@@ -1270,7 +1283,7 @@ h3 {
   outline: 0;
   background: transparent;
   color: #526157;
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
 }
 .document-items {
@@ -1284,7 +1297,7 @@ h3 {
 }
 .document-row.chosen {
   background: #f5f9f5;
-  box-shadow: inset 3px 0 #448463;
+  box-shadow: inset 0 0 0 1px #a7c3ae;
 }
 .document-open {
   width: 100%;
@@ -1312,7 +1325,7 @@ h3 {
 }
 .document-category {
   color: #668472;
-  font: 9px var(--mono);
+  font: 10px var(--mono);
   text-transform: uppercase;
 }
 .document-main b {
@@ -1324,7 +1337,7 @@ h3 {
 }
 .document-main small {
   color: #8b978e;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1352,7 +1365,7 @@ h3 {
   border: 1px solid #e6ebe6;
   color: #738178;
   background: #fafbf9;
-  font-size: 9px;
+  font-size: 10px;
   cursor: pointer;
 }
 .tag-chip:hover,
@@ -1392,7 +1405,7 @@ h3 {
   padding: 20px;
 }
 .reader-content .markdown {
-  font-size: 12px;
+  font-size: 14px;
 }
 .reader-content .markdown h1 {
   display: none;
@@ -1504,9 +1517,9 @@ h3 {
 .policy-row p,
 .privacy-action p,
 .account-delete p {
-  color: #6f7d73;
+  color: var(--muted);
   margin: 0;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.65;
 }
 .policy-full-link {
@@ -1634,7 +1647,8 @@ h3 {
   margin-bottom: 14px;
   color: #94622c;
   background: #fff7e8;
-  border-left: 3px solid #d9a45d;
+  border: 1px solid #e8d3b4;
+  border-radius: 4px;
 }
 .warning-banner span {
   display: flex;
@@ -1662,7 +1676,7 @@ th {
   padding: 10px 11px;
   background: #f6f8f5;
   color: #819087;
-  font: 9px var(--mono);
+  font: 10px var(--mono);
   font-weight: 400;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1672,7 +1686,7 @@ td {
   padding: 11px;
   border-bottom: 1px solid #edf0ec;
   color: #59675e;
-  font-size: 10px;
+  font-size: 12px;
   vertical-align: middle;
 }
 tr:last-child td {
@@ -1680,13 +1694,13 @@ tr:last-child td {
 }
 .table-primary {
   color: #2d4135;
-  font-size: 11px;
+  font-size: 13px;
 }
 .table-sub {
   display: block;
   margin-top: 4px;
   color: #89958c;
-  font-size: 9px;
+  font-size: 10px;
   text-transform: capitalize;
 }
 .endpoint-cell {
@@ -1708,7 +1722,7 @@ tr:last-child td {
   border-radius: 2px;
   color: #5e7565;
   background: #eef3ed;
-  font-size: 9px;
+  font-size: 10px;
   text-transform: capitalize;
 }
 .plan-badge.premium {
@@ -1792,7 +1806,7 @@ tr:last-child td {
 }
 .stat-cell span {
   color: #89948c;
-  font: 9px var(--mono);
+  font: 10px var(--mono);
 }
 .stat-cell b {
   color: #2a4737;
@@ -1851,7 +1865,7 @@ tr:last-child td {
 .feedback-exchange p {
   margin: 0;
   color: #4f5e54;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.5;
   max-height: 75px;
   overflow: auto;
@@ -1990,7 +2004,7 @@ td code {
 .policy-copy p {
   color: #647269;
   margin: 0;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.65;
 }
 .modal-actions {
@@ -2033,7 +2047,7 @@ td code {
   gap: 5px;
   align-items: center;
   color: #818e85;
-  font-size: 9px;
+  font-size: 10px;
 }
 .connection-modal {
   width: min(100%, 600px);
@@ -2054,7 +2068,7 @@ td code {
 .provider-help {
   margin: -7px 0 0;
   color: #829087;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.5;
 }
 .number-fields {
@@ -2257,7 +2271,7 @@ td code {
 }
 .field-hint {
   color: #87938b;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .model-info-badge {
@@ -2732,7 +2746,7 @@ td code {
   }
   .main-nav button {
     padding: 0 10px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .main-nav button.active::after {
     left: 10px;
@@ -2753,7 +2767,7 @@ td code {
     width: 35px;
   }
   .chat-layout {
-    height: calc(100vh - 106px);
+    height: calc(100dvh - 106px);
     grid-template-columns: 190px minmax(0, 1fr);
     min-height: 520px;
   }
@@ -2823,28 +2837,29 @@ td code {
     flex-direction: column;
     justify-content: center;
     gap: 2px;
-    min-width: 66px;
+    min-width: 68px;
     padding: 2px 5px 5px;
-    font-size: 9px;
+    font-size: 11px;
   }
   .main-nav button.active::after {
     left: 7px;
     right: 7px;
   }
   .chat-layout {
-    height: calc(100vh - 106px);
-    min-height: 490px;
+    height: calc(100dvh - 106px);
+    min-height: 0;
     display: flex;
     flex-direction: column;
   }
   .conversation-rail {
-    order: 2;
+    order: 0;
     flex: 0 0 auto;
     padding: 0;
     border-right: 0;
-    border-top: 1px solid var(--line);
+    border-top: 0;
+    border-bottom: 1px solid var(--line);
     background: #f7f9f6;
-    max-height: 94px;
+    max-height: 72px;
   }
   .rail-heading,
   .new-thread,
@@ -2892,13 +2907,13 @@ td code {
   }
   .chat-toolbar h1 {
     max-width: 72vw;
-    font-size: 15px;
+    font-size: 17px;
   }
   .chat-toolbar .eyebrow {
-    font-size: 8px;
+    font-size: 10px;
   }
   .online-label {
-    font-size: 8px;
+    font-size: 10px;
     gap: 6px;
   }
   .message-scroll {
@@ -2911,7 +2926,7 @@ td code {
     font-size: 19px;
   }
   .welcome-state > p {
-    font-size: 11px;
+    font-size: 13px;
   }
   .suggestion-grid {
     grid-template-columns: 1fr;
@@ -2919,8 +2934,8 @@ td code {
     margin-top: 17px;
   }
   .suggestion {
-    min-height: 46px;
-    font-size: 10px;
+    min-height: 52px;
+    font-size: 12px;
   }
   .composer-wrap {
     padding: 8px 10px 10px;
@@ -2929,18 +2944,18 @@ td code {
     padding: 7px 7px 7px 10px;
   }
   .composer textarea {
-    min-height: 38px;
-    font-size: 11px;
+    min-height: 44px;
+    font-size: 14px;
   }
   .composer-foot {
-    font-size: 8px;
+    font-size: 10px;
   }
   .composer-foot span:last-child {
     display: none;
   }
   .question-bubble {
     max-width: 85%;
-    font-size: 11px;
+    font-size: 13px;
     padding: 9px 10px;
   }
   .assistant-mark,
@@ -2950,13 +2965,13 @@ td code {
   }
   .answer-meta {
     flex-wrap: wrap;
-    font-size: 8px;
+    font-size: 9px;
   }
   .markdown {
-    font-size: 11px;
+    font-size: 13px;
   }
   .source-chip {
-    font-size: 9px;
+    font-size: 11px;
   }
   .answer-actions {
     flex-wrap: wrap;
@@ -2975,7 +2990,7 @@ td code {
     font-size: 23px;
   }
   .page-heading p {
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.5;
   }
   .document-count {
@@ -3011,7 +3026,7 @@ td code {
   }
   .page-heading .privacy-stamp,
   .page-heading .admin-seal {
-    font-size: 8px;
+    font-size: 10px;
     padding-left: 8px;
     gap: 6px;
   }
@@ -3025,7 +3040,7 @@ td code {
   }
   .admin-tabs button {
     padding: 11px 9px;
-    font-size: 10px;
+    font-size: 11px;
     gap: 5px;
   }
   .admin-section {
@@ -3035,9 +3050,9 @@ td code {
     align-items: flex-start;
   }
   .section-toolbar .button {
-    min-height: 33px;
-    padding: 0 8px;
-    font-size: 10px;
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 11px;
   }
   .section-toolbar h2 {
     font-size: 15px;
@@ -3096,14 +3111,14 @@ td code {
     padding: 0;
   }
   .auth-aside-copy .eyebrow {
-    font-size: 8px;
+    font-size: 9px;
   }
   .auth-aside-copy h1 {
     font-size: 28px;
     margin: 8px 0;
   }
   .auth-aside-copy p {
-    font-size: 11px;
+    font-size: 12px;
     margin: 0;
   }
   .aside-foot {
@@ -3133,7 +3148,7 @@ td code {
   }
   .auth-bottom {
     margin-top: 28px;
-    font-size: 8px;
+    font-size: 9px;
   }
   .plan-options {
     gap: 5px;
@@ -3143,7 +3158,7 @@ td code {
     min-height: 110px;
   }
   .plan-description {
-    font-size: 8px;
+    font-size: 9px;
   }
   .modal-scrim {
     padding: 8px;

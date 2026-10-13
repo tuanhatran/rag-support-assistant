@@ -51,7 +51,8 @@ def build_container(settings: Settings, database=None, client=None, vectorstore:
             vectorstore = UnconfiguredVectorStore()
     ingestion = IngestionService(repos, settings, audit, vectorstore)
     return Container(client, repos, settings, knowledge, audit,
-                     AuthService(repos, settings, audit), ChatService(repos, settings, knowledge, audit),
+                     AuthService(repos, settings, audit),
+                     ChatService(repos, settings, knowledge, audit, vectorstore, ingestion.provider_factory),
                      FeedbackService(repos, settings, audit), PrivacyService(repos, settings, audit),
                      AdminService(repos, settings, audit),
                      vectorstore, ingestion)
