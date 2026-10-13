@@ -48,7 +48,8 @@ async def test_connection(connection_id: str, request: Request, user=Depends(req
         if connection["provider"] == "mock":
             answer = mock_answer([])
         else:
-            api_key = decrypt_secret(container.settings.encryption_key, connection.get("api_key_encrypted", ""))
+            encrypted_key = connection.get("api_key_encrypted", "")
+            api_key = decrypt_secret(container.settings.encryption_key, encrypted_key) if encrypted_key else ""
             answer = await complete(connection, api_key,
                 [{"role": "system", "content": "Reply with a brief connection test confirmation."},
                  {"role": "user", "content": "Connection test"}], container.settings.llm_timeout_seconds)

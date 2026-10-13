@@ -7,8 +7,9 @@ from datetime import timedelta
 
 from bson import ObjectId
 
+from app.embeddings import validate_embedding_dimensions
 from app.errors import AuthenticationError, ConfigurationError, NotFoundError, ValidationError
-from app.llm import build_messages, complete, mock_answer
+from app.llm import build_messages, complete, is_keyless_ollama, mock_answer
 from app.observability import log_event
 from app.redaction import redact
 from app.repositories import utcnow
@@ -83,8 +84,102 @@ class AuthService:
 
 
 class ChatService:
-    def __init__(self, repos, settings, knowledge, audit):
+    def __init__(self, repos, settings, knowledge, audit, vectorstore=None, embedding_provider_factory=None):
         self.repos, self.settings, self.knowledge, self.audit = repos, settings, knowledge, audit
+        self.vectorstore = vectorstore
+        self.embedding_provider_factory = embedding_provider_factory
+
+    @staticmethod
+    def _source_identity(source: dict) -> tuple[str, str, str]:
+        source_type = source.get("source_type", "bundled")
+        if source_type == "ingested":
+            return source_type, str(source.get("pipeline_id", "")), str(source.get("chunk_index", ""))
+        return source_type, str(source.get("document_id", "")), str(source.get("section", ""))
+
+    @classmethod
+    def _merge_ranked_sources(cls, ranked_lists: list[list[dict]], top_k: int) -> list[dict]:
+        candidates: dict[tuple[str, str, str], dict] = {}
+        for ranked in ranked_lists:
+            seen = set()
+            for rank, source in enumerate(ranked, start=1):
+                source = dict(source)
+                source.setdefault("source_type", "bundled")
+                identity = cls._source_identity(source)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                item = candidates.setdefault(identity, {"source": source, "rank_score": 0.0})
+                item["rank_score"] += 1 / (60 + rank)
+
+        ordered = sorted(candidates.items(), key=lambda item: (
+            -item[1]["rank_score"], item[0],
+        ))
+        results = []
+        seen_text = set()
+        for _, item in ordered:
+            source = item["source"]
+            normalized_text = " ".join(source.get("text", "").split()).casefold()
+            if normalized_text and normalized_text in seen_text:
+                continue
+            if normalized_text:
+                seen_text.add(normalized_text)
+            results.append(source)
+            if len(results) >= top_k:
+                break
+        return results
+
+    async def _ingested_sources(self, chunks: list[dict]) -> list[dict]:
+        sources = []
+        pipelines = {}
+        for chunk in chunks:
+            pipeline_id = str(chunk.get("pipeline_id", ""))
+            if pipeline_id not in pipelines:
+                try:
+                    pipeline_oid = ObjectId(pipeline_id)
+                except Exception:
+                    continue
+                pipelines[pipeline_id] = await self.repos.ingestion_pipelines.find_one(
+                    {"_id": pipeline_oid, "expires_at": {"$gt": utcnow()}}
+                )
+            pipeline = pipelines[pipeline_id]
+            if not pipeline:
+                continue
+            content = redact(chunk.get("content", ""))
+            sources.append({
+                "document_title": redact(pipeline.get("filename") or "Ingested document"),
+                "category": "Ingested document",
+                "section": f"Chunk {int(chunk.get('chunk_index', 0)) + 1}",
+                "score": round(float(chunk.get("similarity", 0)), 5),
+                "excerpt": content[:200],
+                "text": content,
+                "source_type": "ingested",
+                "pipeline_id": pipeline_id,
+                "chunk_index": int(chunk.get("chunk_index", 0)),
+            })
+        return sources
+
+    async def _hybrid_sources(self, question: str) -> list[dict]:
+        top_k = self.settings.retrieval_top_k
+        ranked_lists = [[{**source, "source_type": "bundled"}
+                         for source in self.knowledge.search(question, top_k)]]
+        if self.vectorstore is None or self.embedding_provider_factory is None:
+            return self._merge_ranked_sources(ranked_lists, top_k)
+        try:
+            models = await self.vectorstore.list_embedding_models()
+        except Exception:
+            return self._merge_ranked_sources(ranked_lists, top_k)
+        for model in models:
+            try:
+                provider = self.embedding_provider_factory(model, self.settings)
+                vectors = await provider.embed([question])
+                validate_embedding_dimensions(model, vectors, expected_count=1)
+                chunks = await self.vectorstore.search_chunks(vectors[0], model, top_k)
+                ingested = await self._ingested_sources(chunks)
+                if ingested:
+                    ranked_lists.append(ingested)
+            except Exception:
+                continue
+        return self._merge_ranked_sources(ranked_lists, top_k)
 
     async def create_session(self, user: dict):
         now = utcnow()
@@ -107,7 +202,7 @@ class ChatService:
         if not session:
             raise NotFoundError("Conversation not found")
         safe_question = redact(question)
-        sources = self.knowledge.search(safe_question, self.settings.retrieval_top_k)
+        sources = await self._hybrid_sources(safe_question)
         connection = await AuthService(self.repos, self.settings, self.audit).connection_for_plan(user["plan"])
         history = [item for item in session.get("messages", []) if item.get("status") == "ok"][-self.settings.history_turns:]
         messages = build_messages(safe_question, sources, history)
@@ -118,7 +213,8 @@ class ChatService:
             answer = mock_answer(sources)
         else:
             try:
-                key = decrypt_secret(self.settings.encryption_key, connection.get("api_key_encrypted", ""))
+                encrypted_key = connection.get("api_key_encrypted", "")
+                key = decrypt_secret(self.settings.encryption_key, encrypted_key) if encrypted_key else ""
                 answer = await complete(connection, key, messages, self.settings.llm_timeout_seconds)
                 answer = redact(answer)
             except Exception as exc:
@@ -243,10 +339,10 @@ class AdminService:
             value.update(api_key_encrypted=encrypt_secret(self.settings.encryption_key, key), api_key_hint="****" + key[-4:])
         elif existing:
             value.update(api_key_encrypted=existing.get("api_key_encrypted", ""), api_key_hint=existing.get("api_key_hint", ""))
-        elif body.provider != "mock":
-            raise ValidationError("An API key is required for this provider")
         if body.provider == "mock":
             value.update(api_key_encrypted="", api_key_hint="")
+        elif not value.get("api_key_encrypted") and not is_keyless_ollama(value):
+            raise ValidationError("An API key is required for this provider")
         for plan in body.plans:
             await self.repos.connections.update_many({"plans": plan, **({"_id": {"$ne": existing["_id"]}} if existing else {})},
                                                      {"$pull": {"plans": plan}})

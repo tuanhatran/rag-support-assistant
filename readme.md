@@ -1,10 +1,10 @@
 # RAG Support Assistant
 
-A RAG (Retrieval-Augmented Generation) support assistant. Chat answers IT troubleshooting questions from the bundled knowledge base, with sources and answer feedback. Admins can also run a separate document-ingestion pipeline that embeds uploaded files into PostgreSQL/pgvector; those uploaded vectors are not currently used by chat retrieval. Users sign in, and each user's plan decides which LLM answers them.
+A RAG (Retrieval-Augmented Generation) support assistant. Chat answers IT troubleshooting questions from the bundled knowledge base and, when PostgreSQL/pgvector and a configured embedding provider are available, active ingested document chunks too. Chat includes sources and answer feedback, and falls back to the bundled knowledge base when vector retrieval is unavailable. Users sign in, and each user's plan decides which LLM answers them.
 
 | Part | Stack |
 | --- | --- |
-| Backend | Python 3.13, FastAPI, PyMongo (async), BM25 chat retrieval, embedding ingestion |
+| Backend | Python 3.13, FastAPI, PyMongo (async), BM25 + pgvector hybrid chat retrieval |
 | Frontend | React 19, TypeScript, Vite |
 | Databases | MongoDB 7; PostgreSQL 17 with pgvector for ingestion |
 
@@ -13,8 +13,8 @@ A RAG (Retrieval-Augmented Generation) support assistant. Chat answers IT troubl
 - **Accounts and RBAC**: users sign up with a username, password, and plan, then sign in. There are two roles, `user` and `admin`. Admin pages and endpoints require the `admin` role. Each user sees only their own conversations.
 - **Plan-based model assignment**: the plan chosen at sign-up (`basic`, `standard`, or `premium`) decides which LLM connection answers that user. Each plan is served by exactly one connection, and admins can reassign plans or change a user's plan at any time.
 - **Chat knowledge base**: 10 troubleshooting Markdown documents in `backend/app/data/documents` (VPN, lockout, Outlook, printers, Wi-Fi, Kubernetes, databases, API gateway, disk space, and laptop performance). They are split by `##` section and indexed with BM25 at startup. Chat searches this bundled index.
-- **AI chat**: each question retrieves the top sections, builds a grounded prompt (with the last 3 exchanges as history), and calls the model assigned to the user's plan. Answers show clickable sources.
-- **Admin document ingestion**: admins can upload `.txt` or `.pdf` files up to 500 KB. The background pipeline extracts and redacts text, chunks it with configurable size, overlap, and separator, creates embeddings, and stores chunks in PostgreSQL/pgvector. Pipeline history shows stage status, extracted text, and chunk previews, and can copy an export payload as JSON. Ingestion is separate from the bundled chat knowledge base; uploaded chunks do not currently affect chat answers.
+- **AI chat**: each question retrieves from the bundled BM25 knowledge base and, when PostgreSQL/pgvector and a configured embedding provider are available, searches active ingested chunks too. Chat builds a grounded prompt (with the last 3 exchanges as history), calls the model assigned to the user's plan, and returns citations for both source types. BM25 remains available when vector retrieval is not configured or fails.
+- **Admin document ingestion**: admins can upload `.txt` or `.pdf` files up to 500 KB. The background pipeline extracts and redacts text, chunks it with configurable size, overlap, and separator, creates embeddings, and stores chunks in PostgreSQL/pgvector. Active chunks can ground chat answers when vector retrieval is available. Pipeline history shows stage status, extracted text, and chunk previews, and can copy an export payload as JSON.
 - **Embedding models**: Cloudflare Workers AI (`@cf/baai/bge-small-en-v1.5`), local FastEmbed (`sentence-transformers/all-MiniLM-L6-v2` or `BAAI/bge-base-en-v1.5`), and OpenAI (`text-embedding-3-small`). Cloudflare and OpenAI require their corresponding API configuration; FastEmbed runs locally.
 - **LLM connections (admin)**: add, edit, test, and delete connections, and choose which plans each one serves:
   - `mock`: built-in simulator. It needs no network or key and serves all plans by default.
@@ -49,6 +49,12 @@ docker compose up --build
 ```
 
 Docker Compose starts MongoDB, PostgreSQL with pgvector, the backend, and frontend. Open http://localhost:8080 (API docs: http://localhost:8080/docs).
+
+### Use local Ollama
+
+Install Ollama and download the model with `ollama pull deepseek-r1:14b`. In **Admin → Connections**, add an `openai` connection with model `deepseek-r1:14b`, no API key, and assign it to the desired plans. When the backend runs directly on your computer, use `http://localhost:11434/v1` as the base URL.
+
+When the backend runs in Docker, use `http://host.docker.internal:11434/v1` so the container can reach Ollama on the host. On Linux, make sure the backend container can resolve `host.docker.internal` (for example, map it to `host-gateway` in Compose). Ollama must listen on an interface reachable from Docker; restrict that access to trusted local networks. Test the connection from the admin page before assigning plans.
 
 ## Run locally (Windows)
 
