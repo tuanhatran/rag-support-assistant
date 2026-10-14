@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RAG Support Assistant architecture</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --color-paper: #f5f5f5; /* white-smoke */
+        --color-ink: #2d3142; /* jet-black */
+        --color-muted: #4f5d75; /* blue-slate */
+        --color-accent: #bf4520; /* burnt-tangerine */
+        --font-sans: "Geist", system-ui, sans-serif;
+        --font-serif: "Instrument Serif", "Noto Serif", "Noto Serif KR", serif;
+        --font-mono: "Geist Mono", ui-monospace, monospace;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background: var(--color-paper);
+        color: var(--color-ink);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem 2rem;
+      }
+
+      .frame {
+        max-width: 1280px;
+        width: 100%;
+      }
+      /* The SVG holds its readable width (min-width == the viewBox width, so the
+       type ramp is never silently scaled down). This wrapper lets a narrow
+       screen scroll the diagram instead of the whole page. */
+      .diagram-container {
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        font-weight: 500;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--color-muted);
+        margin-bottom: 0.5rem;
+      }
+
+      h1 {
+        font-family: var(--font-serif);
+        font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+        font-weight: 400;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        color: var(--color-ink);
+        margin-bottom: 1.5rem;
+      }
+
+      svg {
+        width: 100%;
+        min-width: 1280px;
+        display: block;
+      }
+      /* Paper has no scrollbar, so the local scroller would clip instead of
+       scroll. Let the diagram scale down to the sheet: smaller but whole
+       beats sharp but cut off. Must come after the svg rule above - a media
+       query adds no specificity, so a later plain rule would win. */
+      @media print {
+        .diagram-container {
+          overflow-x: visible;
+        }
+        svg {
+          min-width: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <p class="eyebrow">Architecture · Diagram Design</p>
+      <h1>RAG Support Assistant architecture</h1>
+
+      <div class="diagram-container">
+        <svg
+          viewBox="0 0 1280 720"
+          xmlns="http://www.w3.org/2000/svg"
+          role="img"
+          aria-labelledby="architecture-title architecture-desc"
+        >
+          <title id="architecture-title">
+            RAG Support Assistant architecture
+          </title>
+          <desc id="architecture-desc">
+            React SPA calls the FastAPI backend, which searches a bundled BM25
+            index and pgvector, stores data in MongoDB, and calls LLM and
+            embedding providers; ingestion runs as a background pipeline.
+          </desc>
+          <defs>
+            <marker
+              id="arrow"
+              markerWidth="8"
+              markerHeight="6"
+              refX="7"
+              refY="3"
+              orient="auto"
+            >
+              <polygon points="0 0, 8 3, 0 6" fill="#4f5d75" />
+            </marker>
+            <marker
+              id="arrow-accent"
+              markerWidth="8"
+              markerHeight="6"
+              refX="7"
+              refY="3"
+              orient="auto"
+            >
+              <polygon points="0 0, 8 3, 0 6" fill="#bf4520" />
+            </marker>
+            <marker
+              id="arrow-link"
+              markerWidth="8"
+              markerHeight="6"
+              refX="7"
+              refY="3"
+              orient="auto"
+            >
+              <polygon points="0 0, 8 3, 0 6" fill="#2e5aa8" />
+            </marker>
+          </defs>
+
+          <rect width="100%" height="100%" fill="#f5f5f5" />
+
+          <!-- Zone: backend container -->
+          <rect
+            x="460"
+            y="104"
+            width="360"
+            height="392"
+            rx="8"
+            fill="rgba(45,49,66,0.02)"
+            stroke="rgba(45,49,66,0.10)"
+            stroke-width="0.8"
+          />
+          <rect x="472" y="108" width="100" height="12" rx="2" fill="#f5f5f5" />
+          <text
+            x="478"
+            y="117"
+            fill="#5a6580"
+            font-size="7"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            letter-spacing="0.14em"
+          >
+            BACKEND · FASTAPI
+          </text>
+
+          <!-- Arrows (drawn before nodes) -->
+          <!-- Browser to FastAPI: /api via nginx -->
+          <line
+            x1="360"
+            y1="292"
+            x2="484"
+            y2="292"
+            stroke="#2e5aa8"
+            stroke-width="1.2"
+            marker-end="url(#arrow-link)"
+          />
+          <rect x="406" y="272" width="32" height="12" rx="2" fill="#f5f5f5" />
+          <text
+            x="422"
+            y="281"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.06em"
+          >
+            /API
+          </text>
+
+          <!-- FastAPI to BM25 knowledge base -->
+          <line
+            x1="624"
+            y1="256"
+            x2="624"
+            y2="208"
+            stroke="#4f5d75"
+            stroke-width="1.2"
+            marker-end="url(#arrow)"
+          />
+          <rect x="632" y="226" width="48" height="12" rx="2" fill="#f5f5f5" />
+          <text
+            x="656"
+            y="235"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.06em"
+          >
+            SEARCH
+          </text>
+
+          <!-- FastAPI to ingestion pipeline -->
+          <line
+            x1="624"
+            y1="328"
+            x2="624"
+            y2="400"
+            stroke="#4f5d75"
+            stroke-width="1.2"
+            marker-end="url(#arrow)"
+          />
+          <rect x="632" y="358" width="48" height="12" rx="2" fill="#f5f5f5" />
+          <text
+            x="656"
+            y="367"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.06em"
+          >
+            UPLOAD
+          </text>
+
+          <!-- FastAPI to MongoDB -->
+          <path
+            d="M764,274 H834 Q842,274 842,266 V180 Q842,172 850,172 H920"
+            fill="none"
+            stroke="#4f5d75"
+            stroke-width="1.2"
+            marker-end="url(#arrow)"
+          />
+          <rect x="863" y="152" width="44" height="12" rx="2" fill="#f5f5f5" />
+          <text
+            x="885"
+            y="161"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.06em"
+          >
+            PERSIST
+          </text>
+
+          <!-- FastAPI to LLM providers -->
+          <line
+            x1="764"
+            y1="292"
+            x2="920"
+            y2="292"
+            stroke="#2e5aa8"
+            stroke-width="1.2"
+            marker-end="url(#arrow-link)"
+          />
+          <rect x="856" y="272" width="52" height="12" rx="2" fill="#f5f5f5" />
+          <text
+            x="882"
+            y="281"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.06em"
+          >
+            COMPLETE
+          </text>
+
+          <!-- FastAPI to pgvector (hybrid retrieval) -->
+          <path
+            d="M764,310 H834 Q842,310 842,318 V400 Q842,408 850,408 H920"
+            fill="none"
+            stroke="#4f5d75"
+            stroke-width="1.2"
+            marker-end="url(#arrow)"
+          />
+          <rect x="850" y="353" width="48" height="12" rx="2" fill="#f5f5f5" />
+          <text
+            x="874"
+            y="362"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.06em"
+          >
+            VECTOR
+          </text>
+
+          <!-- Ingestion to pgvector (async store) -->
+          <line
+            x1="764"
+            y1="428"
+            x2="920"
+            y2="428"
+            stroke="#4f5d75"
+            stroke-width="1"
+            stroke-dasharray="5,4"
+            marker-end="url(#arrow)"
+          />
+          <rect x="856" y="436" width="40" height="12" rx="2" fill="#f5f5f5" />
+          <text
+            x="876"
+            y="445"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.06em"
+          >
+            STORE
+          </text>
+
+          <!-- Ingestion to embedding providers (async, external API) -->
+          <path
+            d="M764,456 H834 Q842,456 842,464 V520 Q842,528 850,528 H920"
+            fill="none"
+            stroke="#2e5aa8"
+            stroke-width="1"
+            stroke-dasharray="5,4"
+            marker-end="url(#arrow-link)"
+          />
+          <rect x="850" y="486" width="40" height="12" rx="2" fill="#f5f5f5" />
+          <text
+            x="870"
+            y="495"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.06em"
+          >
+            EMBED
+          </text>
+
+          <!-- Node: Browser SPA (input) -->
+          <rect x="80" y="256" width="280" height="72" rx="6" fill="#f5f5f5" />
+          <rect
+            x="80"
+            y="256"
+            width="280"
+            height="72"
+            rx="6"
+            fill="rgba(79,93,117,0.10)"
+            stroke="#5a6580"
+            stroke-width="1"
+          />
+          <rect
+            x="88"
+            y="262"
+            width="36"
+            height="12"
+            rx="2"
+            fill="none"
+            stroke="rgba(90,101,128,0.40)"
+            stroke-width="0.8"
+          />
+          <text
+            x="106"
+            y="271"
+            fill="#5a6580"
+            font-size="7"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.08em"
+          >
+            INPUT
+          </text>
+          <text
+            x="220"
+            y="292"
+            fill="#2d3142"
+            font-size="12"
+            font-weight="600"
+            font-family="'Geist', system-ui, sans-serif"
+            text-anchor="middle"
+          >
+            React SPA
+          </text>
+          <text
+            x="220"
+            y="310"
+            fill="#4f5d75"
+            font-size="9"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+          >
+            React 19 · nginx :8080 · /api proxy
+          </text>
+
+          <!-- Node: FastAPI backend (focal) -->
+          <rect x="484" y="256" width="280" height="72" rx="6" fill="#f5f5f5" />
+          <rect
+            x="484"
+            y="256"
+            width="280"
+            height="72"
+            rx="6"
+            fill="rgba(191,69,32,0.08)"
+            stroke="#bf4520"
+            stroke-width="1"
+          />
+          <rect
+            x="492"
+            y="262"
+            width="44"
+            height="12"
+            rx="2"
+            fill="none"
+            stroke="rgba(191,69,32,0.40)"
+            stroke-width="0.8"
+          />
+          <text
+            x="514"
+            y="271"
+            fill="#bf4520"
+            font-size="7"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.08em"
+          >
+            BACKEND
+          </text>
+          <text
+            x="624"
+            y="292"
+            fill="#2d3142"
+            font-size="12"
+            font-weight="600"
+            font-family="'Geist', system-ui, sans-serif"
+            text-anchor="middle"
+          >
+            FastAPI backend
+          </text>
+          <text
+            x="624"
+            y="310"
+            fill="#4f5d75"
+            font-size="9"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+          >
+            routers · services · repositories
+          </text>
+
+          <!-- Node: BM25 knowledge base (in-process) -->
+          <rect x="484" y="136" width="280" height="72" rx="6" fill="#f5f5f5" />
+          <rect
+            x="484"
+            y="136"
+            width="280"
+            height="72"
+            rx="6"
+            fill="#ffffff"
+            stroke="#2d3142"
+            stroke-width="1"
+          />
+          <rect
+            x="492"
+            y="142"
+            width="60"
+            height="12"
+            rx="2"
+            fill="none"
+            stroke="rgba(45,49,66,0.40)"
+            stroke-width="0.8"
+          />
+          <text
+            x="522"
+            y="151"
+            fill="#2d3142"
+            font-size="7"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.08em"
+          >
+            IN-PROCESS
+          </text>
+          <text
+            x="624"
+            y="172"
+            fill="#2d3142"
+            font-size="12"
+            font-weight="600"
+            font-family="'Geist', system-ui, sans-serif"
+            text-anchor="middle"
+          >
+            BM25 knowledge base
+          </text>
+          <text
+            x="624"
+            y="190"
+            fill="#4f5d75"
+            font-size="9"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+          >
+            10 bundled docs · split by ## section
+          </text>
+
+          <!-- Node: Ingestion pipeline (background worker) -->
+          <rect x="484" y="400" width="280" height="72" rx="6" fill="#f5f5f5" />
+          <rect
+            x="484"
+            y="400"
+            width="280"
+            height="72"
+            rx="6"
+            fill="#ffffff"
+            stroke="#2d3142"
+            stroke-width="1"
+          />
+          <rect
+            x="492"
+            y="406"
+            width="40"
+            height="12"
+            rx="2"
+            fill="none"
+            stroke="rgba(45,49,66,0.40)"
+            stroke-width="0.8"
+          />
+          <text
+            x="512"
+            y="415"
+            fill="#2d3142"
+            font-size="7"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.08em"
+          >
+            WORKER
+          </text>
+          <text
+            x="624"
+            y="436"
+            fill="#2d3142"
+            font-size="12"
+            font-weight="600"
+            font-family="'Geist', system-ui, sans-serif"
+            text-anchor="middle"
+          >
+            Ingestion pipeline
+          </text>
+          <text
+            x="624"
+            y="454"
+            fill="#4f5d75"
+            font-size="9"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+          >
+            parse · chunk · embed · store
+          </text>
+
+          <!-- Node: MongoDB 7 (store) -->
+          <rect x="920" y="136" width="280" height="72" rx="6" fill="#f5f5f5" />
+          <rect
+            x="920"
+            y="136"
+            width="280"
+            height="72"
+            rx="6"
+            fill="rgba(45,49,66,0.05)"
+            stroke="#4f5d75"
+            stroke-width="1"
+          />
+          <rect
+            x="928"
+            y="142"
+            width="36"
+            height="12"
+            rx="2"
+            fill="none"
+            stroke="rgba(79,93,117,0.40)"
+            stroke-width="0.8"
+          />
+          <text
+            x="946"
+            y="151"
+            fill="#4f5d75"
+            font-size="7"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.08em"
+          >
+            STORE
+          </text>
+          <text
+            x="1060"
+            y="172"
+            fill="#2d3142"
+            font-size="12"
+            font-weight="600"
+            font-family="'Geist', system-ui, sans-serif"
+            text-anchor="middle"
+          >
+            MongoDB 7
+          </text>
+          <text
+            x="1060"
+            y="190"
+            fill="#4f5d75"
+            font-size="9"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+          >
+            users · sessions · chats · audit
+          </text>
+
+          <!-- Node: LLM providers (external) -->
+          <rect x="920" y="256" width="280" height="72" rx="6" fill="#f5f5f5" />
+          <rect
+            x="920"
+            y="256"
+            width="280"
+            height="72"
+            rx="6"
+            fill="rgba(45,49,66,0.03)"
+            stroke="rgba(45,49,66,0.30)"
+            stroke-width="1"
+          />
+          <rect
+            x="928"
+            y="262"
+            width="48"
+            height="12"
+            rx="2"
+            fill="none"
+            stroke="rgba(45,49,66,0.40)"
+            stroke-width="0.8"
+          />
+          <text
+            x="952"
+            y="271"
+            fill="#2d3142"
+            font-size="7"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.08em"
+          >
+            EXTERNAL
+          </text>
+          <text
+            x="1060"
+            y="292"
+            fill="#2d3142"
+            font-size="12"
+            font-weight="600"
+            font-family="'Geist', system-ui, sans-serif"
+            text-anchor="middle"
+          >
+            LLM providers
+          </text>
+          <text
+            x="1060"
+            y="310"
+            fill="#4f5d75"
+            font-size="9"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+          >
+            mock · OpenAI-compatible · Azure · Anthropic
+          </text>
+
+          <!-- Node: PostgreSQL + pgvector (store) -->
+          <rect x="920" y="392" width="280" height="72" rx="6" fill="#f5f5f5" />
+          <rect
+            x="920"
+            y="392"
+            width="280"
+            height="72"
+            rx="6"
+            fill="rgba(45,49,66,0.05)"
+            stroke="#4f5d75"
+            stroke-width="1"
+          />
+          <rect
+            x="928"
+            y="398"
+            width="36"
+            height="12"
+            rx="2"
+            fill="none"
+            stroke="rgba(79,93,117,0.40)"
+            stroke-width="0.8"
+          />
+          <text
+            x="946"
+            y="407"
+            fill="#4f5d75"
+            font-size="7"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.08em"
+          >
+            STORE
+          </text>
+          <text
+            x="1060"
+            y="428"
+            fill="#2d3142"
+            font-size="12"
+            font-weight="600"
+            font-family="'Geist', system-ui, sans-serif"
+            text-anchor="middle"
+          >
+            PostgreSQL + pgvector
+          </text>
+          <text
+            x="1060"
+            y="446"
+            fill="#4f5d75"
+            font-size="9"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+          >
+            document_chunks · embedding vectors
+          </text>
+
+          <!-- Node: Embedding providers (external) -->
+          <rect x="920" y="492" width="280" height="72" rx="6" fill="#f5f5f5" />
+          <rect
+            x="920"
+            y="492"
+            width="280"
+            height="72"
+            rx="6"
+            fill="rgba(45,49,66,0.03)"
+            stroke="rgba(45,49,66,0.30)"
+            stroke-width="1"
+          />
+          <rect
+            x="928"
+            y="498"
+            width="48"
+            height="12"
+            rx="2"
+            fill="none"
+            stroke="rgba(45,49,66,0.40)"
+            stroke-width="0.8"
+          />
+          <text
+            x="952"
+            y="507"
+            fill="#2d3142"
+            font-size="7"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+            letter-spacing="0.08em"
+          >
+            EXTERNAL
+          </text>
+          <text
+            x="1060"
+            y="528"
+            fill="#2d3142"
+            font-size="12"
+            font-weight="600"
+            font-family="'Geist', system-ui, sans-serif"
+            text-anchor="middle"
+          >
+            Embedding providers
+          </text>
+          <text
+            x="1060"
+            y="546"
+            fill="#4f5d75"
+            font-size="9"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            text-anchor="middle"
+          >
+            Workers AI · FastEmbed · OpenAI
+          </text>
+
+          <!-- Legend strip -->
+          <line
+            x1="80"
+            y1="632"
+            x2="1200"
+            y2="632"
+            stroke="rgba(45,49,66,0.10)"
+            stroke-width="0.8"
+          />
+          <text
+            x="80"
+            y="656"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            letter-spacing="0.14em"
+          >
+            LEGEND
+          </text>
+          <line
+            x1="170"
+            y1="652"
+            x2="194"
+            y2="652"
+            stroke="#4f5d75"
+            stroke-width="1.2"
+          />
+          <text
+            x="202"
+            y="656"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            letter-spacing="0.06em"
+          >
+            SYNC CALL
+          </text>
+          <line
+            x1="318"
+            y1="652"
+            x2="342"
+            y2="652"
+            stroke="#2e5aa8"
+            stroke-width="1.2"
+          />
+          <text
+            x="350"
+            y="656"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            letter-spacing="0.06em"
+          >
+            HTTP · EXTERNAL API
+          </text>
+          <line
+            x1="498"
+            y1="652"
+            x2="522"
+            y2="652"
+            stroke="#4f5d75"
+            stroke-width="1"
+            stroke-dasharray="5,4"
+          />
+          <text
+            x="530"
+            y="656"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            letter-spacing="0.06em"
+          >
+            ASYNC / BACKGROUND
+          </text>
+          <rect
+            x="668"
+            y="646"
+            width="24"
+            height="12"
+            rx="2"
+            fill="rgba(191,69,32,0.08)"
+            stroke="#bf4520"
+            stroke-width="1"
+          />
+          <text
+            x="700"
+            y="656"
+            fill="#5a6580"
+            font-size="8"
+            font-family="'Geist Mono', ui-monospace, monospace"
+            letter-spacing="0.06em"
+          >
+            FOCAL
+          </text>
+        </svg>
+      </div>
+    </div>
+  </body>
+</html>
