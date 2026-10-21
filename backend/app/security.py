@@ -10,6 +10,7 @@ from cryptography.fernet import Fernet, InvalidToken
 SCRYPT_N = 2**14
 SCRYPT_R = 8
 SCRYPT_P = 1
+SESSION_COOKIE_NAME = "rag-support-assistant"
 
 
 def hash_password(password: str) -> dict[str, str | int]:

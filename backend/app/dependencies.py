@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
 from pathlib import Path
 
-from bson import ObjectId
 from fastapi import Request
 from pymongo import AsyncMongoClient
 
@@ -16,7 +14,7 @@ from app.ingestion import IngestionService
 from app.observability import request_context
 from app.rag import KnowledgeBase
 from app.repositories import Repositories, seed_connection, utcnow
-from app.security import hash_password, hash_token
+from app.security import SESSION_COOKIE_NAME, hash_password, hash_token
 from app.services import AdminService, AuthService, ChatService, FeedbackService, PrivacyService
 from app.vectorstore import PgVectorStore, UnconfiguredVectorStore, VectorStore
 
@@ -72,20 +70,22 @@ async def initialize_container(container: Container) -> None:
     if container.settings.bootstrap_admin_password:
         username = container.settings.bootstrap_admin_username.strip().lower()
         if not await container.repos.get_user_by_username(username):
-            from datetime import datetime, timezone
-            await container.repos.users.insert_one({"username": username,
-                "password": hash_password(container.settings.bootstrap_admin_password), "role": "admin", "plan": "premium",
-                "policy_consent": {"version": container.settings.data_policy_version,
-                                   "accepted_at": datetime.now(timezone.utc)},
-                "created_at": datetime.now(timezone.utc)})
+            await container.repos.insert_user({
+                "username": username,
+                "password": hash_password(container.settings.bootstrap_admin_password),
+                "role": "admin",
+                "plan": "premium",
+                "policy_consent": {"version": container.settings.data_policy_version, "accepted_at": utcnow()},
+                "created_at": utcnow(),
+            })
 
 
 async def current_user(request: Request):
     container = request.app.state.container
-    token = request.cookies.get("rag-support-assistant")
+    token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
         raise AuthenticationError("Authentication required")
-    session = await container.repos.sessions.find_one({"_id": hash_token(token), "expires_at": {"$gt": utcnow()}})
+    session = await container.repos.get_session(hash_token(token))
     if not session:
         raise AuthenticationError("Authentication required")
     user = await container.repos.get_user(session["user_id"])

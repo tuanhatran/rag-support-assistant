@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-from bson import ObjectId
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.dependencies import require_admin
-from app.errors import NotFoundError
-from app.llm import complete, mock_answer
 from app.schemas import ConnectionRequest, UserUpdateRequest
-from app.security import decrypt_secret
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -37,37 +33,12 @@ async def delete_connection(connection_id: str, request: Request, user=Depends(r
 
 @router.post("/connections/{connection_id}/test")
 async def test_connection(connection_id: str, request: Request, user=Depends(require_admin)):
-    container = request.app.state.container
-    try:
-        connection = await container.repos.connections.find_one({"_id": ObjectId(connection_id)})
-    except Exception:
-        connection = None
-    if not connection:
-        raise NotFoundError("Connection not found")
-    try:
-        if connection["provider"] == "mock":
-            answer = mock_answer([])
-        else:
-            encrypted_key = connection.get("api_key_encrypted", "")
-            api_key = decrypt_secret(container.settings.encryption_key, encrypted_key) if encrypted_key else ""
-            answer = await complete(connection, api_key,
-                [{"role": "system", "content": "Reply with a brief connection test confirmation."},
-                 {"role": "user", "content": "Connection test"}], container.settings.llm_timeout_seconds)
-        outcome = "success"
-        result = {"ok": True, "message": answer[:240]}
-    except Exception as exc:
-        outcome = "failure"
-        result = {"ok": False, "message": f"Connection test failed ({type(exc).__name__})"}
-    await container.audit.record("admin.connection.tested", outcome, user, {"connection_id": connection_id},
-                                 details={"provider": connection["provider"], "model": connection["model"]}, request=request)
-    return result
+    return await request.app.state.container.admin.test_connection(user, connection_id, request)
 
 
 @router.get("/users")
 async def list_users(request: Request, user=Depends(require_admin)):
-    records = await request.app.state.container.repos.users.find({}, {"username": 1, "role": 1, "plan": 1, "created_at": 1}).sort("username", 1).to_list(length=1000)
-    return [{"id": str(item["_id"]), "username": item["username"], "role": item["role"],
-             "plan": item["plan"], "created_at": item.get("created_at")} for item in records]
+    return await request.app.state.container.admin.list_users()
 
 
 @router.patch("/users/{user_id}")
@@ -78,22 +49,17 @@ async def update_user(user_id: str, body: UserUpdateRequest, request: Request, u
 @router.get("/feedback")
 async def feedback_list(request: Request, rating: str = Query(default="", pattern="^(up|down)?$"),
                         user=Depends(require_admin)):
-    query = {"rating": rating} if rating else {}
-    records = await request.app.state.container.repos.feedback.find(query, {"_id": 0}).sort("created_at", -1).to_list(length=1000)
-    return records
+    return await request.app.state.container.admin.list_feedback(rating)
 
 
 @router.get("/feedback/stats")
 async def feedback_stats(request: Request, user=Depends(require_admin)):
-    records = await request.app.state.container.repos.feedback.find({}, {"rating": 1}).to_list(length=10000)
-    total = len(records)
-    helpful = sum(item.get("rating") == "up" for item in records)
-    down = total - helpful
-    return {"total": total, "helpful": helpful, "not_helpful": down,
-            "satisfaction_percent": round(helpful / total * 100) if total else 0}
+    return await request.app.state.container.admin.feedback_stats()
 
 
 @router.get("/audit")
-async def audit_list(request: Request, event: str = "", outcome: str = "", username: str = "",
+async def audit_list(request: Request, event: str = Query(default="", max_length=100),
+                     outcome: str = Query(default="", max_length=100),
+                     username: str = Query(default="", max_length=100),
                      user=Depends(require_admin)):
     return await request.app.state.container.admin.audit_list(event, outcome, username)

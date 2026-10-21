@@ -18,9 +18,9 @@ from app.embeddings import (
     get_embedding_provider,
     validate_embedding_dimensions,
 )
-from app.errors import ConfigurationError, NotFoundError, ValidationError
+from app.errors import NotFoundError, ValidationError
 from app.redaction import redact
-from app.repositories import Repositories, utcnow
+from app.repositories import Repositories, parse_object_id, utcnow
 from app.vectorstore import VectorStore
 
 MAX_STREAM_DECOMPRESSED_BYTES = 2 * 1024 * 1024  # 2 MB per stream
@@ -239,7 +239,7 @@ class IngestionService:
             "updated_at": utcnow(),
             "expires_at": expires_at,
         }
-        await self.repos.db["ingestion_pipelines"].insert_one(document)
+        await self.repos.insert_pipeline(document)
 
         options = {
             "chunk_size": chunk_size,
@@ -261,18 +261,12 @@ class IngestionService:
         options: dict[str, Any],
         actor: dict | None,
     ) -> None:
-        try:
-            oid = ObjectId(pipeline_id)
-        except Exception:
-            oid = pipeline_id
-
-        pipelines = self.repos.db["ingestion_pipelines"]
+        oid = parse_object_id(pipeline_id)
+        if oid is None:
+            return
 
         try:
-            await pipelines.update_one(
-                {"_id": oid},
-                {"$set": {"status": "running", "updated_at": utcnow()}},
-            )
+            await self.repos.update_pipeline(oid, {"$set": {"status": "running", "updated_at": utcnow()}})
             await self.audit.record(
                 "admin.ingestion.started",
                 "success",
@@ -281,9 +275,8 @@ class IngestionService:
             )
 
             # Stage 1: file_parsing
-            await pipelines.update_one(
-                {"_id": oid},
-                {"$set": {"stages.file_parsing.status": "running", "updated_at": utcnow()}},
+            await self.repos.update_pipeline(
+                oid, {"$set": {"stages.file_parsing.status": "running", "updated_at": utcnow()}}
             )
             t0 = time.monotonic()
             raw_text = parse_document(file_bytes, filename)
@@ -293,8 +286,8 @@ class IngestionService:
 
             if not extracted_text.strip():
                 err_msg = "No text could be extracted from this document"
-                await pipelines.update_one(
-                    {"_id": oid},
+                await self.repos.update_pipeline(
+                    oid,
                     {
                         "$set": {
                             "stages.file_parsing.status": "failed",
@@ -316,8 +309,8 @@ class IngestionService:
                     pass
                 return
 
-            await pipelines.update_one(
-                {"_id": oid},
+            await self.repos.update_pipeline(
+                oid,
                 {
                     "$set": {
                         "stages.file_parsing.status": "done",
@@ -329,9 +322,8 @@ class IngestionService:
             )
 
             # Stage 2: chunking
-            await pipelines.update_one(
-                {"_id": oid},
-                {"$set": {"stages.chunking.status": "running", "updated_at": utcnow()}},
+            await self.repos.update_pipeline(
+                oid, {"$set": {"stages.chunking.status": "running", "updated_at": utcnow()}}
             )
             t0 = time.monotonic()
             chunks = chunk_text(
@@ -341,8 +333,8 @@ class IngestionService:
                 options["separator"],
             )
             lat_chunking = max(1, int((time.monotonic() - t0) * 1000))
-            await pipelines.update_one(
-                {"_id": oid},
+            await self.repos.update_pipeline(
+                oid,
                 {
                     "$set": {
                         "stages.chunking.status": "done",
@@ -354,17 +346,16 @@ class IngestionService:
             )
 
             # Stage 3: embedding
-            await pipelines.update_one(
-                {"_id": oid},
-                {"$set": {"stages.embedding.status": "running", "updated_at": utcnow()}},
+            await self.repos.update_pipeline(
+                oid, {"$set": {"stages.embedding.status": "running", "updated_at": utcnow()}}
             )
             t0 = time.monotonic()
             provider = self.provider_factory(options["embedding_model"], self.settings)
             vectors = await provider.embed(chunks)
             validate_embedding_dimensions(options["embedding_model"], vectors, expected_count=len(chunks))
             lat_embedding = max(1, int((time.monotonic() - t0) * 1000))
-            await pipelines.update_one(
-                {"_id": oid},
+            await self.repos.update_pipeline(
+                oid,
                 {
                     "$set": {
                         "stages.embedding.status": "done",
@@ -375,9 +366,8 @@ class IngestionService:
             )
 
             # Stage 4: database_ready
-            await pipelines.update_one(
-                {"_id": oid},
-                {"$set": {"stages.database_ready.status": "running", "updated_at": utcnow()}},
+            await self.repos.update_pipeline(
+                oid, {"$set": {"stages.database_ready.status": "running", "updated_at": utcnow()}}
             )
             t0 = time.monotonic()
             dims = EMBEDDING_MODELS[options["embedding_model"]]["dimensions"]
@@ -397,8 +387,8 @@ class IngestionService:
             ]
             await self.vectorstore.insert_chunks(records)
             lat_db = max(1, int((time.monotonic() - t0) * 1000))
-            await pipelines.update_one(
-                {"_id": oid},
+            await self.repos.update_pipeline(
+                oid,
                 {
                     "$set": {
                         "stages.database_ready.status": "done",
@@ -420,7 +410,7 @@ class IngestionService:
             # Determine which stage failed
             doc = None
             try:
-                doc = await pipelines.find_one({"_id": oid})
+                doc = await self.repos.get_pipeline(oid)
             except Exception:
                 pass
 
@@ -442,7 +432,7 @@ class IngestionService:
                 update_fields[f"stages.{failed_stage}.status"] = "failed"
 
             try:
-                await pipelines.update_one({"_id": oid}, {"$set": update_fields})
+                await self.repos.update_pipeline(oid, {"$set": update_fields})
             except Exception:
                 pass
 
@@ -458,11 +448,8 @@ class IngestionService:
 
 
     async def get_pipeline(self, pipeline_id: str) -> dict[str, Any]:
-        try:
-            oid = ObjectId(pipeline_id)
-        except Exception:
-            oid = pipeline_id
-        doc = await self.repos.db["ingestion_pipelines"].find_one({"_id": oid})
+        oid = parse_object_id(pipeline_id)
+        doc = await self.repos.get_pipeline(oid) if oid is not None else None
         if not doc:
             raise NotFoundError(f"Ingestion pipeline {pipeline_id} not found")
         return {
@@ -480,12 +467,7 @@ class IngestionService:
         }
 
     async def list_pipelines(self) -> list[dict[str, Any]]:
-        cursor = (
-            self.repos.db["ingestion_pipelines"]
-            .find({}, {"extracted_text": 0, "stages": 0})
-            .sort("created_at", -1)
-        )
-        docs = await cursor.to_list(length=MAX_PIPELINES_LIST)
+        docs = await self.repos.list_pipelines(MAX_PIPELINES_LIST)
         return [
             {
                 "id": str(doc["_id"]),
@@ -507,7 +489,12 @@ class IngestionService:
         return await self.vectorstore.get_chunks_preview(pipeline_id)
 
     async def mark_interrupted_on_startup(self) -> None:
-        await self.repos.db["ingestion_pipelines"].update_many(
-            {"status": {"$in": ["queued", "running"]}},
-            {"$set": {"status": "failed", "error": "interrupted by restart", "updated_at": utcnow()}},
-        )
+        await self.repos.mark_pipelines_interrupted()
+
+    async def aclose(self) -> None:
+        tasks = list(self.background_tasks)
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self.background_tasks.clear()

@@ -232,7 +232,7 @@ def test_admin_can_create_and_test_keyless_local_ollama_connection(harness, monk
     })
     assert remote.status_code == 409
 
-    from app.routers import admin as admin_router
+    from app import services as services_module
     seen = {}
 
     async def fake_complete(connection, api_key, messages, timeout):
@@ -240,7 +240,7 @@ def test_admin_can_create_and_test_keyless_local_ollama_connection(harness, monk
         seen["model"] = connection["model"]
         return "Connection confirmed"
 
-    monkeypatch.setattr(admin_router, "complete", fake_complete)
+    monkeypatch.setattr(services_module, "complete", fake_complete)
     tested = client.post(f"/api/admin/connections/{connection['id']}/test")
     assert tested.status_code == 200
     assert tested.json() == {"ok": True, "message": "Connection confirmed"}

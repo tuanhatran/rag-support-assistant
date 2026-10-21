@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import json
 
-from fastapi.encoders import jsonable_encoder
 from fastapi import APIRouter, Depends, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import consented_user, current_user
-from app.errors import NotFoundError
 from app.llm import is_keyless_ollama
 from app.observability import request_context
 from app.schemas import MessageRequest
@@ -23,8 +22,7 @@ async def active_model(request: Request, user=Depends(current_user)):
 
 @router.get("/sessions")
 async def list_sessions(request: Request, user=Depends(current_user)):
-    sessions = await request.app.state.container.repos.list_user_sessions(str(user["_id"]))
-    return [request.app.state.container.chat.serialize_session(item, include_messages=False) for item in sessions]
+    return await request.app.state.container.chat.list_sessions(user)
 
 
 @router.post("/sessions", status_code=201)
@@ -34,20 +32,12 @@ async def create_session(request: Request, user=Depends(consented_user)):
 
 @router.get("/sessions/{session_id}")
 async def get_session(request: Request, session_id: str, user=Depends(current_user)):
-    session = await request.app.state.container.repos.get_chat(session_id, str(user["_id"]))
-    if not session:
-        raise NotFoundError("Conversation not found")
-    return request.app.state.container.chat.serialize_session(session)
+    return await request.app.state.container.chat.get_session(user, session_id)
 
 
 @router.delete("/sessions/{session_id}")
 async def delete_session(request: Request, session_id: str, user=Depends(current_user)):
-    repos = request.app.state.container.repos
-    result = await repos.chat_sessions.delete_one({"_id": session_id, "user_id": str(user["_id"])})
-    if not result.deleted_count:
-        raise NotFoundError("Conversation not found")
-    await repos.feedback.delete_many({"session_id": session_id, "user_id": str(user["_id"])})
-    return {"ok": True}
+    return await request.app.state.container.chat.delete_session(user, session_id, request)
 
 
 @router.post("/sessions/{session_id}/messages")

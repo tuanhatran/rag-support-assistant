@@ -39,7 +39,9 @@ def create_app(
                 except asyncio.CancelledError:
                     break
                 except Exception as exc:
-                    logging.getLogger("app.vectorstore").warning("Error during vectorstore sweep: %s", exc)
+                    logging.getLogger("app.vectorstore").warning(
+                        "Error during vectorstore sweep: %s", type(exc).__name__
+                    )
 
         sweep_task = asyncio.create_task(sweep_loop())
         try:
@@ -50,6 +52,7 @@ def create_app(
                 await sweep_task
             except asyncio.CancelledError:
                 pass
+            await container.ingestion.aclose()
             if container.client:
                 await container.client.close()
 

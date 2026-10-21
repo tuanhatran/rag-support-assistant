@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import JSONResponse
 
 from app.dependencies import require_admin
-from app.errors import NotFoundError, ValidationError
+from app.errors import ValidationError
 from app.ingestion import validate_ingestion_options
 
 router = APIRouter(prefix="/admin/ingestion", tags=["admin-ingestion"])

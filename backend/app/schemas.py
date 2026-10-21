@@ -70,9 +70,29 @@ class ConnectionRequest(BaseModel):
     max_tokens: int = Field(default=1200, ge=1, le=16000)
     plans: list[Plan] = Field(default_factory=list)
 
+    @field_validator("name", "model")
+    @classmethod
+    def required_text_not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Field cannot be blank")
+        return stripped
+
+    @field_validator("base_url", "api_version")
+    @classmethod
+    def optional_text_stripped(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("plans")
+    @classmethod
+    def plans_are_unique(cls, value: list[str]) -> list[str]:
+        if len(set(value)) != len(value):
+            raise ValueError("Duplicate plan")
+        return value
+
     @model_validator(mode="after")
     def azure_requires_endpoint_and_version(self):
-        if self.provider == "azure_openai" and (not self.base_url.strip() or not self.api_version.strip()):
+        if self.provider == "azure_openai" and (not self.base_url or not self.api_version):
             raise ValueError("Azure OpenAI requires a base URL and API version")
         return self
 
