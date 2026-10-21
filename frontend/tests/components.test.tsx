@@ -528,9 +528,7 @@ describe('admin components', () => {
     const onClose = vi.fn()
     const onSubmit = vi.fn((event) => event.preventDefault())
     const props = { editing: null, connections: [], busy: false, error: '', onChange, onClose, onSubmit }
-    const { rerender } = render(
-      <ConnectionDialog {...props} form={{ ...blankConnection, provider: 'openai' }} />,
-    )
+    const { rerender } = render(<ConnectionDialog {...props} form={{ ...blankConnection, provider: 'openai' }} />)
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Local route' } })
     fireEvent.change(screen.getByLabelText('Model or deployment'), { target: { value: 'llama' } })
     fireEvent.change(screen.getByLabelText('Base URL'), { target: { value: 'http://localhost:11434/v1' } })
