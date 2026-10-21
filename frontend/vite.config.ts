@@ -6,12 +6,19 @@ export default defineConfig({
   server: { proxy: { '/api': 'http://localhost:8000' } },
   test: {
     environment: 'jsdom',
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
       reportsDirectory: './node_modules/.cache/vitest-coverage',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/main.tsx', 'src/types.ts', 'src/types/**', 'src/**/*.d.ts'],
+      exclude: [
+        'src/main.tsx',
+        'src/types.ts',
+        'src/types/**',
+        'src/**/*.d.ts',
+        'src/**/*.test.{ts,tsx}',
+        'src/test/**',
+      ],
       thresholds: { statements: 90, branches: 90, functions: 90, lines: 90 },
     },
   },

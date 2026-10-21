@@ -8,8 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "git pucy:open": "cypress open",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css}\" \"tests/**/*.{ts,tsx,js,jsx}\" \"cypress/**/*.{ts,tsx,js,jsx}\" index.html vite.config.ts cypress.config.ts cypress/tsconfig.json \"tsconfig*.json\" package.json package-lock.json .prettierrc.json ../.github/workflows/ci.yml",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css}\" \"tests/**/*.{ts,tsx,js,jsx}\" \"cypress/**/*.{ts,tsx,js,jsx}\" index.html vite.config.ts cypress.config.ts cypress/tsconfig.json \"tsconfig*.json\" package.json package-lock.json .prettierrc.json ../.github/workflows/ci.yml",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css}\" \"cypress/**/*.{ts,tsx,js,jsx}\" index.html vite.config.ts cypress.config.ts cypress/tsconfig.json \"tsconfig*.json\" package.json package-lock.json .prettierrc.json ../.github/workflows/ci.yml",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css}\" \"cypress/**/*.{ts,tsx,js,jsx}\" index.html vite.config.ts cypress.config.ts cypress/tsconfig.json \"tsconfig*.json\" package.json package-lock.json .prettierrc.json ../.github/workflows/ci.yml",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "e2e": "cypress run"
