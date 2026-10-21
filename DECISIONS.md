@@ -23,7 +23,7 @@ This document records the main implementation trade-offs for the RAG Support Ass
 - **Separate planning, implementation, testing, and review.** The stages progress from planner to coder to tester to reviewer, with statuses controlling who may act and what each role may edit. The orchestrator can run the stages end to end; individual agents can also be invoked manually, and an existing task can resume from its recorded status.
 - **Constrain context and edits per task.** The planner names the allowed context files; agents use the project file graph and task handoff to stay within that scope. This reduces unrelated changes and keeps implementation focused, though an incomplete or stale handoff can constrain an agent with missing context. Branch checks require a clean worktree before switching and stop rather than risk carrying unrelated edits onto another task's branch.
 - **Require validation and cap repair loops.** The workflow carries backend test and frontend build commands in the handoff, routes failed checks or review findings back for fixes, and blocks after three fix rounds. This gives tasks an explicit completion path while leaving final quality dependent on the acceptance criteria and the checks actually run.
-- **Route models by role.** The documented workflow uses Claude Sonnet 5.5 for planning and review, and Gemini 3.8 Flash for coding and testing. Keeping model routing in the handoff makes the intended assignment visible and repeatable in the agent picker.
+- **Route models by role.** The Qoder workflow pins `DeepSeek-Flash` for planning, coding, testing, review, and orchestration in `.qoder/agents/`. Keeping model routing in the agent definitions and the handoff makes the intended assignment visible and repeatable.
 
 ## Current Status
 

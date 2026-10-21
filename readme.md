@@ -122,7 +122,7 @@ Set `CYPRESS_BASE_URL` to test another origin, for example `http://localhost:517
 
 ## Development workflow (agents)
 
-Five custom agents in `.github/agents/` split each task into planner, coder, tester, and reviewer stages, with an orchestrator to coordinate them. Each task (ticket) has its own handoff file `.github/handoff/tasks/<TASK-ID>.md`, for example `PROJ-123.md`, created by the planner from [.github/handoff/TEMPLATE.md](.github/handoff/TEMPLATE.md). The handoff carries shared state, so stages can run in fresh chat sessions and multiple tasks can be in flight. Each task uses one branch shared by all stages; the branch is recorded in the handoff and reused on resume. Agents preserve existing staged and unstaged changes, attempt branch operations non-destructively, and do not commit or push.
+Five custom agents in `.github/agents/` (GitHub Copilot) and matching Qoder definitions in `.qoder/agents/` split each task into planner, coder, tester, and reviewer stages, with an orchestrator to coordinate them. Each task (ticket) has its own handoff file: `.github/handoff/tasks/<TASK-ID>.md` for the Copilot agents and `.qoder/handoff/tasks/<TASK-ID>.md` for the Qoder agents, for example `PROJ-123.md`, created by the planner from the matching `TEMPLATE.md`. The handoff carries shared state, so stages can run in fresh chat sessions and multiple tasks can be in flight. Each task uses one branch shared by all stages; the branch is recorded in the handoff and reused on resume. Agents preserve existing staged and unstaged changes, attempt branch operations non-destructively, and do not commit or push.
 
 | Agent      | Acts when Status is                   | Can edit                        | Sets Status to                            |
 | ---------- | ------------------------------------- | ------------------------------- | ----------------------------------------- |
@@ -133,7 +133,7 @@ Five custom agents in `.github/agents/` split each task into planner, coder, tes
 
 Pick `orchestrator` in the agent dropdown and give the ticket, for example `PROJ-123: add a password strength meter`, to run planner, coder, tester, and reviewer automatically until `DONE` or `BLOCKED`. Running it again with an existing ID resumes that task from its current status. To run stages by hand instead, pick `planner` and give the ID and description, then each next agent with the same ID. After 3 fix rounds the task goes to `BLOCKED` and back to the planner. Finished task files stay in `.github/handoff/tasks/` as the record. Shared project rules for all agents live in [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
-**Models.** The planner and reviewer use Claude Sonnet 5.5; the coder and tester use Gemini 3.8 Flash. Each task file carries the routing table copied from the template.
+**Models.** The Qoder agents in `.qoder/agents/` pin `DeepSeek-Flash` for the planner, coder, tester, reviewer, and orchestrator. The GitHub Copilot agents keep their own `model` frontmatter in `.github/agents/`. Each task file carries the routing table copied from the template.
 
 **Code context.** The planner lists task-specific _Context files_ in each handoff. Agents use CodeGraph MCP for codebase structure and dependency exploration instead of maintaining a separate file graph.
 

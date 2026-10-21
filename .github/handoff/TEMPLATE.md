@@ -9,13 +9,13 @@ Use `CHANGES_REQUESTED` for review findings, `BLOCKED` for unresolved decisions,
 
 ## Model Routing
 
-| Complexity | Coder      | Tester     | Reviewer   |
-| ---------- | ---------- | ---------- | ---------- |
-| S          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| M          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
-| L          | GPT-6 Luna | GPT-6 Luna | GPT-6 Luna |
+| Complexity | Coder          | Tester         | Reviewer       |
+| ---------- | -------------- | -------------- | -------------- |
+| S          | DeepSeek-Flash | DeepSeek-Flash | DeepSeek-Flash |
+| M          | DeepSeek-Flash | DeepSeek-Flash | DeepSeek-Flash |
+| L          | DeepSeek-Flash | DeepSeek-Flash | DeepSeek-Flash |
 
-Planner model: GPT-6 Luna. Use the exact model name in the agent picker.
+Planner model: DeepSeek-Flash. Qoder pins this in `.qoder/agents/`; GitHub Copilot pins its own model in `.github/agents/`.
 
 ## Current Task
 
