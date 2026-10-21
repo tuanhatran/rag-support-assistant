@@ -1,9 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/App'
+import * as api from '../src/api'
 import { AppShell } from '../src/components/AppShell'
 import { AccountForm } from '../src/components/auth/AccountForm'
+import { LoginPage } from '../src/components/LoginPage'
 import { ChatView } from '../src/components/ChatView'
 import { DocumentsView } from '../src/components/DocumentsView'
 import { PrivacyView } from '../src/components/PrivacyView'
@@ -272,6 +274,51 @@ describe('authentication and application shell', () => {
     expect(onDeleted).not.toHaveBeenCalled()
     expect(onPolicyAccepted).not.toHaveBeenCalled()
   })
+
+  it('opens and closes the data policy from the login screen', async () => {
+    render(<LoginPage onAuthenticated={vi.fn()} />)
+    await user().click(screen.getByRole('tab', { name: 'Create account' }))
+    await user().click(screen.getByRole('button', { name: 'data policy' }))
+    expect(await screen.findByRole('dialog', { name: 'Current data policy' })).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Close policy' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('falls back when plan options fail, reports sign-in errors, and clears them on tab switch', async () => {
+    vi.mocked(authApi.getPlanOptions).mockRejectedValueOnce(new Error('Plans offline'))
+    vi.mocked(authApi.signIn).mockRejectedValueOnce(new Error('Bad credentials'))
+    render(<AccountForm onAuthenticated={vi.fn()} onOpenPolicy={vi.fn()} />)
+    await user().click(screen.getByRole('tab', { name: 'Create account' }))
+    expect(await screen.findAllByText('Support model access')).toHaveLength(3)
+    expect(screen.getAllByText('Model unavailable')).toHaveLength(3)
+    await user().click(screen.getByRole('tab', { name: 'Sign in' }))
+    await user().type(screen.getByLabelText('Username'), 'ava')
+    await user().type(screen.getByLabelText('Password'), 'secret')
+    await user().click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Bad credentials')
+    await user().click(screen.getByRole('tab', { name: 'Sign in' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('returns to login when the session becomes unauthorized or the account is deleted', async () => {
+    const handlerSpy = vi.spyOn(api, 'setUnauthorizedHandler')
+    render(<App />)
+    expect(await screen.findByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument()
+    const handleUnauthorized = handlerSpy.mock.calls[0][0] as () => void
+    expect(handleUnauthorized).toBeTypeOf('function')
+    act(() => handleUnauthorized())
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+
+    await user().type(screen.getByLabelText('Username'), 'ava')
+    await user().type(screen.getByLabelText('Password'), 'password')
+    await user().click(screen.getByRole('button', { name: 'Sign in' }))
+    await screen.findByRole('navigation', { name: 'Main navigation' })
+    await user().click(screen.getByRole('button', { name: 'Privacy' }))
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await user().type(await screen.findByLabelText('Confirm password'), 'password')
+    await user().click(screen.getByRole('button', { name: /Delete account permanently/ }))
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+  })
 })
 
 describe('chat and document workflows', () => {
@@ -371,6 +418,69 @@ describe('chat and document workflows', () => {
     await user().click(screen.getByRole('button', { name: /VPN guide/ }))
     expect(await screen.findByText('Document unavailable')).toBeInTheDocument()
   })
+
+  it('creates a session on first send and handles source, rating, feedback and delete failures', async () => {
+    vi.mocked(chatApi.listSessions).mockResolvedValue([])
+    vi.mocked(documentApi.getDocument).mockRejectedValueOnce(new Error('Document unavailable'))
+    vi.mocked(chatApi.submitFeedback)
+      .mockRejectedValueOnce(new Error('Rating failed'))
+      .mockRejectedValueOnce(new Error('Feedback failed'))
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<ChatView onBrowseDocuments={vi.fn()} />)
+    await screen.findByText('How can we help?')
+    await user().type(screen.getByRole('textbox', { name: 'Your question' }), 'First question')
+    await user().click(screen.getByRole('button', { name: 'Send question' }))
+    await waitFor(() => expect(chatApi.createSession).toHaveBeenCalledOnce())
+    expect(chatApi.sendMessage).toHaveBeenCalledWith('created-1', 'First question', expect.any(Function))
+    expect(await screen.findByRole('heading', { name: 'First question' })).toBeInTheDocument()
+
+    await user().click(screen.getByRole('button', { name: /VPN guide/ }))
+    expect(await screen.findByText('Document unavailable')).toBeInTheDocument()
+
+    await user().click(screen.getByRole('button', { name: 'Helpful' }))
+    expect(await screen.findByText('Rating failed')).toBeInTheDocument()
+
+    await user().click(screen.getByRole('button', { name: 'Not helpful' }))
+    await user().click(
+      within(screen.getByRole('dialog', { name: 'What could be better?' })).getByRole('button', {
+        name: 'Data policy',
+      }),
+    )
+    expect(await screen.findByRole('dialog', { name: 'Current data policy' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'What could be better?' })).not.toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Close policy' }))
+
+    await user().click(screen.getByRole('button', { name: 'Not helpful' }))
+    await user().click(screen.getByRole('button', { name: 'Submit feedback' }))
+    expect(await screen.findByText('Feedback failed')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Close feedback' }))
+
+    await user().click(screen.getByRole('button', { name: 'Delete First question' }))
+    expect(confirm).toHaveBeenCalled()
+    expect(chatApi.deleteSession).not.toHaveBeenCalled()
+    confirm.mockReturnValue(true)
+    vi.mocked(chatApi.deleteSession).mockRejectedValueOnce(new Error('Delete failed'))
+    await user().click(screen.getByRole('button', { name: 'Delete First question' }))
+    expect(await screen.findByText('Delete failed')).toBeInTheDocument()
+  })
+
+  it('clears the selected tag when changing category and reports list and detail failures', async () => {
+    vi.mocked(documentApi.listDocuments).mockResolvedValue([document])
+    render(<DocumentsView />)
+    await screen.findByRole('button', { name: /VPN guide/ })
+    await user().click(screen.getByRole('button', { name: 'vpn' }))
+    await waitFor(() =>
+      expect(documentApi.listDocuments).toHaveBeenLastCalledWith(expect.objectContaining({ tag: 'vpn' })),
+    )
+    vi.mocked(documentApi.listDocuments).mockRejectedValueOnce(new Error('List offline'))
+    await user().selectOptions(screen.getByRole('combobox', { name: 'Filter by category' }), 'Network')
+    expect(await screen.findByText('List offline')).toBeInTheDocument()
+    expect(documentApi.listDocuments).toHaveBeenLastCalledWith({ query: '', category: 'Network', tag: '' })
+
+    vi.mocked(documentApi.getDocument).mockRejectedValueOnce('plain failure')
+    await user().click(screen.getByRole('button', { name: /VPN guide/ }))
+    expect(await screen.findByText('Could not load the document.')).toBeInTheDocument()
+  })
 })
 
 describe('privacy and administration workflows', () => {
@@ -393,6 +503,41 @@ describe('privacy and administration workflows', () => {
     await user().click(screen.getByRole('button', { name: 'Close policy' }))
     await user().click(screen.getByRole('button', { name: /Delete account permanently/ }))
     await waitFor(() => expect(onDeleted).toHaveBeenCalledOnce())
+  })
+
+  it('reports policy, export, erasure and deletion failures and honors delete cancellation', async () => {
+    vi.mocked(privacyApi.getPolicy).mockRejectedValueOnce(new Error('Policy offline'))
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(privacyApi.exportUserData)
+      .mockRejectedValueOnce(new Error('Export unavailable'))
+      .mockRejectedValueOnce('plain export failure')
+    vi.mocked(privacyApi.eraseUserData)
+      .mockRejectedValueOnce(new Error('Erasure unavailable'))
+      .mockRejectedValueOnce('plain erasure failure')
+    vi.mocked(privacyApi.deleteUserAccount)
+      .mockRejectedValueOnce(new Error('Delete unavailable'))
+      .mockRejectedValueOnce('plain deletion failure')
+    render(<PrivacyView onDeleted={vi.fn()} />)
+    expect(await screen.findByText('Policy offline')).toBeInTheDocument()
+
+    await user().click(screen.getByRole('button', { name: /Export data/ }))
+    expect(await screen.findByText('Export unavailable')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: /Export data/ }))
+    expect(await screen.findByText('Export failed.')).toBeInTheDocument()
+
+    await user().click(screen.getByRole('button', { name: /Delete conversations/ }))
+    expect(await screen.findByText('Erasure unavailable')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: /Delete conversations/ }))
+    expect(await screen.findByText('Data erasure failed.')).toBeInTheDocument()
+
+    await user().type(screen.getByLabelText('Confirm password'), 'password')
+    await user().click(screen.getByRole('button', { name: /Delete account permanently/ }))
+    expect(await screen.findByText('Delete unavailable')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: /Delete account permanently/ }))
+    expect(await screen.findByText('Account deletion failed.')).toBeInTheDocument()
+    confirm.mockReturnValue(false)
+    await user().click(screen.getByRole('button', { name: /Delete account permanently/ }))
+    expect(privacyApi.deleteUserAccount).toHaveBeenCalledTimes(2)
   })
 
   it('loads admin tabs, saves a connection, edits a user, filters feedback and audit', async () => {
@@ -438,6 +583,56 @@ describe('privacy and administration workflows', () => {
     await user().click(screen.getByRole('button', { name: 'Delete Standard' }))
     expect(confirm).toHaveBeenCalledWith('Delete Standard?')
     expect(await screen.findByText('Cannot delete')).toBeInTheDocument()
+  })
+
+  it('opens the ingestion pipeline from admin and closes the connection form', async () => {
+    const { container } = render(<AdminView />)
+    await screen.findByRole('heading', { name: 'Connections' })
+    await user().click(screen.getByRole('button', { name: 'Add connection' }))
+    expect(screen.getByRole('dialog', { name: 'Add connection' })).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Close form' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user().click(screen.getByRole('tab', { name: 'Ingestion' }))
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    await user().upload(input, new File(['runbook'], 'guide.txt', { type: 'text/plain' }))
+    await user().click(screen.getByRole('button', { name: 'Process & Ingest Document' }))
+    await user().click(await screen.findByRole('button', { name: 'View Pipeline' }))
+    expect(await screen.findByRole('heading', { name: 'runbook.txt' })).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Back to Ingestion' }))
+    expect(screen.getByRole('heading', { name: 'Document Ingestion Pipeline' })).toBeInTheDocument()
+  })
+
+  it('surfaces admin load and update failures across tabs', async () => {
+    vi.mocked(adminApi.listConnections).mockRejectedValueOnce(new Error('Connections offline'))
+    render(<AdminView />)
+    expect(await screen.findByText('Connections offline')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Dismiss message' }))
+
+    vi.mocked(adminApi.listUsers).mockRejectedValueOnce(new Error('Users offline'))
+    await user().click(screen.getByRole('tab', { name: 'Users' }))
+    expect(await screen.findByText('Users offline')).toBeInTheDocument()
+
+    vi.mocked(adminApi.listFeedback).mockRejectedValueOnce(new Error('Feedback offline'))
+    await user().click(screen.getByRole('tab', { name: 'Chat feedback' }))
+    expect(await screen.findByText('Feedback offline')).toBeInTheDocument()
+
+    vi.mocked(adminApi.listAudit).mockRejectedValueOnce(new Error('Audit offline'))
+    await user().click(screen.getByRole('tab', { name: 'Audit log' }))
+    expect(await screen.findByText('Audit offline')).toBeInTheDocument()
+
+    await user().click(screen.getByRole('tab', { name: 'Users' }))
+    await user().click(await screen.findByRole('button', { name: 'Edit casey' }))
+    await user().selectOptions(screen.getByLabelText('Plan for casey'), 'premium')
+    vi.mocked(adminApi.updateUser).mockRejectedValueOnce(new Error('Update failed'))
+    await user().click(screen.getByRole('button', { name: 'Confirm' }))
+    expect(await screen.findByText('Update failed')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument()
+
+    await user().click(screen.getByRole('tab', { name: 'Audit log' }))
+    vi.mocked(adminApi.listAudit).mockRejectedValueOnce(new Error('Audit submit failed'))
+    await user().click(screen.getByRole('button', { name: 'Apply filters' }))
+    expect(await screen.findByText('Audit submit failed')).toBeInTheDocument()
   })
 })
 
@@ -487,5 +682,46 @@ describe('ingestion workflows', () => {
     expect(screen.getByText(/Pipeline error: Pipeline stopped/)).toBeInTheDocument()
     expect(ingestionApi.getPipelineChunks).not.toHaveBeenCalled()
     vi.useRealTimers()
+  })
+
+  it('reports option and submission failures, then opens the created pipeline by ID', async () => {
+    vi.mocked(ingestionApi.getIngestionOptions).mockRejectedValueOnce(new Error('Options offline'))
+    const onOpenPipeline = vi.fn()
+    const { container } = render(<IngestionView onOpenPipeline={onOpenPipeline} />)
+    expect(await screen.findByText('Options offline')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Dismiss error' }))
+    expect(screen.queryByText('Options offline')).not.toBeInTheDocument()
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    await user().upload(input, new File(['runbook'], 'guide.txt', { type: 'text/plain' }))
+    vi.mocked(ingestionApi.createPipeline).mockRejectedValueOnce(new Error('Pipeline rejected'))
+    await user().click(screen.getByRole('button', { name: 'Process & Ingest Document' }))
+    expect(await screen.findByText('Pipeline rejected')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Dismiss error' }))
+
+    await user().click(screen.getByRole('button', { name: 'Process & Ingest Document' }))
+    await user().click(await screen.findByRole('button', { name: pipeline.id }))
+    expect(onOpenPipeline).toHaveBeenCalledWith(pipeline.id)
+  })
+
+  it('reports ingestion history failures and clears them', async () => {
+    vi.mocked(ingestionApi.listPipelines).mockRejectedValueOnce(new Error('History offline'))
+    render(<IngestionView onOpenPipeline={vi.fn()} />)
+    expect(await screen.findByText('History offline')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Dismiss error' }))
+    expect(screen.queryByText('History offline')).not.toBeInTheDocument()
+  })
+
+  it('falls back to default messages for non-error ingestion failures', async () => {
+    vi.mocked(ingestionApi.getIngestionOptions).mockRejectedValueOnce('offline')
+    vi.mocked(ingestionApi.listPipelines).mockRejectedValueOnce('offline')
+    vi.mocked(ingestionApi.createPipeline).mockRejectedValueOnce('offline')
+    const { container } = render(<IngestionView onOpenPipeline={vi.fn()} />)
+    expect(await screen.findByText('Failed to load options')).toBeInTheDocument()
+    expect(await screen.findByText('Failed to load ingestion history')).toBeInTheDocument()
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    await user().upload(input, new File(['runbook'], 'guide.txt', { type: 'text/plain' }))
+    await user().click(screen.getByRole('button', { name: 'Process & Ingest Document' }))
+    expect(await screen.findByText('Failed to start ingestion pipeline')).toBeInTheDocument()
   })
 })

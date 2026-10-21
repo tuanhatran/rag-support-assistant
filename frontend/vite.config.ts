@@ -12,7 +12,7 @@ export default defineConfig({
       reportsDirectory: './node_modules/.cache/vitest-coverage',
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/main.tsx', 'src/types.ts', 'src/types/**', 'src/**/*.d.ts'],
-      thresholds: { statements: 85, branches: 85, functions: 85, lines: 85 },
+      thresholds: { statements: 90, branches: 90, functions: 90, lines: 90 },
     },
   },
 })

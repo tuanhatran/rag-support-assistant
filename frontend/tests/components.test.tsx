@@ -1,8 +1,10 @@
 import { createRef } from 'react'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Markdown } from '../src/components/Markdown'
+import { PolicyModal } from '../src/components/PolicyModal'
+import * as privacyApi from '../src/api/privacy'
 import { ConversationRail } from '../src/components/chat/ConversationRail'
 import { ChatTranscript } from '../src/components/chat/ChatTranscript'
 import { MessageComposer } from '../src/components/chat/MessageComposer'
@@ -120,7 +122,7 @@ describe('shared and chat components', () => {
     const onDelete = vi.fn()
     const onBrowse = vi.fn()
     const props = { sessions: [], loading: true, onCreate, onSelect, onDelete, onBrowseDocuments: onBrowse }
-    const { rerender } = render(<ConversationRail {...props} />)
+    const { container, rerender } = render(<ConversationRail {...props} />)
     expect(screen.getByText('Loading history...')).toBeInTheDocument()
     rerender(<ConversationRail {...props} loading={false} />)
     expect(screen.getByText(/recent conversations/)).toBeInTheDocument()
@@ -136,10 +138,11 @@ describe('shared and chat components', () => {
     await user().click(screen.getByRole('button', { name: 'Browse knowledge base' }))
     await user().click(screen.getByRole('button', { name: /^Delete/ }))
     await user().click(screen.getAllByRole('button', { name: 'New conversation' })[1])
+    await user().click(container.querySelector('.thread-select')!)
     expect(onCreate).toHaveBeenCalledTimes(2)
     expect(onBrowse).toHaveBeenCalledOnce()
     expect(onDelete).toHaveBeenCalledWith(session.id)
-    expect(onSelect).not.toHaveBeenCalled()
+    expect(onSelect).toHaveBeenCalledWith(session.id)
   })
 
   it('renders suggestions and complete answer states with citations and ratings', async () => {
@@ -152,6 +155,7 @@ describe('shared and chat components', () => {
       <ChatTranscript
         active={null}
         sending
+        streamingAnswer={null}
         endRef={endRef}
         onSendSuggestion={onSendSuggestion}
         onBrowseDocuments={onBrowse}
@@ -174,6 +178,7 @@ describe('shared and chat components', () => {
           messages: [message, { ...message, id: 'm2', status: 'error', redacted: false, sources: [] }],
         }}
         sending={false}
+        streamingAnswer={null}
         endRef={endRef}
         onSendSuggestion={onSendSuggestion}
         onBrowseDocuments={onBrowse}
@@ -251,7 +256,7 @@ describe('shared and chat components', () => {
 
   it('closes source dialog from close control or backdrop', async () => {
     const onClose = vi.fn()
-    const { container } = render(<SourceDialog source={document} onClose={onClose} />)
+    const { container, rerender } = render(<SourceDialog source={document} onClose={onClose} />)
     expect(screen.getByRole('dialog', { name: document.title })).toBeInTheDocument()
     expect(
       screen.getByText((_text, element) => element?.tagName === 'P' && element.textContent === 'Restart the client.'),
@@ -259,6 +264,8 @@ describe('shared and chat components', () => {
     await user().click(screen.getByRole('button', { name: 'Close document' }))
     fireEvent.mouseDown(container.querySelector('.modal-scrim')!, { target: container.querySelector('.modal-scrim') })
     expect(onClose).toHaveBeenCalledTimes(2)
+    rerender(<SourceDialog source={{ ...document, markdown: undefined }} onClose={onClose} />)
+    expect(screen.getByRole('dialog', { name: document.title })).toBeInTheDocument()
   })
 })
 
@@ -304,6 +311,8 @@ describe('documents and privacy components', () => {
     rerender(<DocumentReader document={document} onClose={onClose} />)
     expect(screen.getByText(document.title)).toBeInTheDocument()
     expect(screen.getByText('vpn')).toBeInTheDocument()
+    rerender(<DocumentReader document={{ ...document, markdown: undefined }} onClose={onClose} />)
+    expect(screen.getByText(document.title)).toBeInTheDocument()
     await user().click(screen.getByRole('button', { name: 'Close document' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
@@ -353,6 +362,16 @@ describe('documents and privacy components', () => {
     expect(onExport).toHaveBeenCalledOnce()
     expect(onErase).toHaveBeenCalledOnce()
     expect(onDeleteAccount).toHaveBeenCalledOnce()
+  })
+
+  it('falls back when the policy cannot be loaded and keeps acceptance disabled', async () => {
+    vi.spyOn(privacyApi, 'getPolicy').mockRejectedValueOnce(new Error('Policy offline'))
+    render(<PolicyModal blocking onAccept={vi.fn()} />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(await waitFor(() => screen.getByText('Loading the current policy...'))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Accept policy' })).toBeDisabled()
   })
 })
 
@@ -504,6 +523,71 @@ describe('admin components', () => {
     expect(onChange).toHaveBeenCalledWith({ api_key: 'new-secret', remove_api_key: false })
   })
 
+  it('updates connection fields and classifies local Ollama URLs', async () => {
+    const onChange = vi.fn()
+    const onClose = vi.fn()
+    const onSubmit = vi.fn((event) => event.preventDefault())
+    const props = { editing: null, connections: [], busy: false, error: '', onChange, onClose, onSubmit }
+    const { rerender } = render(
+      <ConnectionDialog {...props} form={{ ...blankConnection, provider: 'openai' }} />,
+    )
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Local route' } })
+    fireEvent.change(screen.getByLabelText('Model or deployment'), { target: { value: 'llama' } })
+    fireEvent.change(screen.getByLabelText('Base URL'), { target: { value: 'http://localhost:11434/v1' } })
+    fireEvent.change(screen.getByLabelText('Temperature'), { target: { value: '0.7' } })
+    fireEvent.change(screen.getByLabelText('Max tokens'), { target: { value: '2048' } })
+    expect(onChange).toHaveBeenCalledWith({ name: 'Local route' })
+    expect(onChange).toHaveBeenCalledWith({ model: 'llama' })
+    expect(onChange).toHaveBeenCalledWith({ base_url: 'http://localhost:11434/v1' })
+    expect(onChange).toHaveBeenCalledWith({ temperature: 0.7 })
+    expect(onChange).toHaveBeenCalledWith({ max_tokens: 2048 })
+
+    const localCases: [string, boolean][] = [
+      ['http://localhost:11434/v1', true],
+      ['http://127.0.0.1:11434/v1/', true],
+      ['http://[::1]:11434/v1', true],
+      ['https://localhost:11434/v1', false],
+      ['http://remote-host:11434/v1', false],
+      ['http://localhost:9999/v1', false],
+      ['http://localhost:11434/api', false],
+      ['http://user:pass@localhost:11434/v1', false],
+      ['http://:pass@localhost:11434/v1', false],
+      ['http://localhost:11434/v1?debug=1', false],
+      ['http://localhost:11434/v1#section', false],
+      ['not a valid url', false],
+    ]
+    for (const [baseUrl, isLocal] of localCases) {
+      rerender(<ConnectionDialog {...props} form={{ ...blankConnection, provider: 'openai', base_url: baseUrl }} />)
+      if (isLocal) expect(screen.getByLabelText('Local LLM')).toBeChecked()
+      else expect(screen.getByLabelText('Local LLM')).not.toBeChecked()
+      if (isLocal) expect(screen.getByLabelText('API key')).not.toBeRequired()
+      else expect(screen.getByLabelText('API key')).toBeRequired()
+    }
+
+    rerender(
+      <ConnectionDialog
+        {...props}
+        form={{ ...blankConnection, provider: 'openai', base_url: 'https://example.com/v1' }}
+      />,
+    )
+    await user().click(screen.getByLabelText('Local LLM'))
+    expect(onChange).toHaveBeenCalledWith({ base_url: 'http://localhost:11434/v1' })
+    rerender(
+      <ConnectionDialog
+        {...props}
+        form={{ ...blankConnection, provider: 'openai', base_url: 'http://localhost:11434/v1' }}
+      />,
+    )
+    await user().click(screen.getByLabelText('Local LLM'))
+    expect(onChange).toHaveBeenCalledWith({ base_url: '' })
+
+    rerender(<ConnectionDialog {...props} form={{ ...blankConnection, provider: 'azure_openai' }} />)
+    fireEvent.change(screen.getByLabelText('API version'), { target: { value: '2024-10-21' } })
+    expect(onChange).toHaveBeenCalledWith({ api_version: '2024-10-21' })
+    fireEvent.change(screen.getByLabelText('Provider'), { target: { value: 'mock' } })
+    expect(onChange).toHaveBeenCalledWith({ provider: 'mock', model: 'extractive-simulator' })
+  })
+
   it('renders staged user edits, model assignment and busy states', async () => {
     const onStartEdit = vi.fn()
     const onCancelEdit = vi.fn()
@@ -541,6 +625,15 @@ describe('admin components', () => {
     )
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument()
+    rerender(
+      <UsersSection
+        {...props}
+        users={[{ ...adminUser, created_at: undefined }]}
+        userEdits={{}}
+        savingUsers={new Set<string>()}
+      />,
+    )
+    expect(screen.getByText('-')).toBeInTheDocument()
   })
 
   it('renders feedback statistics, comments, categories, filters, and empty state', async () => {
@@ -693,6 +786,15 @@ describe('ingestion components', () => {
     expect(onOpen).toHaveBeenCalledWith(summary.id)
     expect(onRefresh).toHaveBeenCalledOnce()
     expect(onDismissError).toHaveBeenCalledOnce()
+    rerender(
+      <PipelineHistory
+        {...props}
+        loading={false}
+        pipelines={[{ ...summary, id: 'old', created_at: '', chunk_count: 0 }]}
+      />,
+    )
+    expect(screen.getByText('-')).toBeInTheDocument()
+    expect(screen.getByText('0 chunks')).toBeInTheDocument()
   })
 
   it('renders all pipeline stage statuses and idle defaults', () => {
@@ -732,6 +834,9 @@ describe('ingestion components', () => {
     const actor = userEvent.setup()
     const { rerender } = render(<PipelineDetails pipeline={pipeline} chunks={[]} onError={onError} />)
     expect(screen.getByText('No chunks were generated from this document.')).toBeInTheDocument()
+    rerender(<PipelineDetails pipeline={{ ...pipeline, status: 'running' }} chunks={[]} onError={onError} />)
+    expect(screen.getByText('Chunks will appear here once the pipeline completes.')).toBeInTheDocument()
+    await actor.click(screen.getByRole('tab', { name: /Chunk Inspector/ }))
     rerender(
       <PipelineDetails
         pipeline={{ ...pipeline, status: 'running', extracted_text: '' }}
@@ -749,7 +854,8 @@ describe('ingestion components', () => {
     vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('clipboard unavailable'))
     await actor.click(screen.getByRole('button', { name: 'Copied!' }))
     expect(onError).toHaveBeenCalledWith('Failed to copy payload to clipboard')
-    rerender(<PipelineDetails pipeline={null} chunks={[]} onError={onError} />)
+    rerender(<PipelineDetails pipeline={null} chunks={[chunk]} onError={onError} />)
+    expect(screen.getByRole('tab', { name: /Chunk Inspector \(1\)/ })).toBeInTheDocument()
     await actor.click(screen.getByRole('tab', { name: /Export Payload/ }))
     await actor.click(screen.getByRole('button', { name: 'Copied!' }))
     expect(onError).toHaveBeenCalledOnce()
